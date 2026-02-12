@@ -114,7 +114,7 @@ const fetchAchievements = async (game) => {
     
     if (!response.ok) {
         if (response.status === 400) {
-             game.achievements = { error: 'No stats' }
+             game.achievements = { error: 'No stats available' }
         } else {
              // For privacy or other errors, mark as error but don't throw heavily
              game.achievements = { error: `Error ${response.status}` }

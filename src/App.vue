@@ -83,9 +83,8 @@ body {
   font-family: 'Roboto', 'Motiva Sans', sans-serif, Arial, Helvetica;
   background-color: #0f1219; /* Very Dark Background */
   color: #c7d5e0; /* Steam Light Text */
-  height: 100vh;
-  width: 100%;
-  overflow: hidden;
+  height: 100%;
+  width: 100vw;
 }
 
 #app {
@@ -97,7 +96,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: 100%;
+  width: 100vw;
   background: radial-gradient(circle at top right, #1b2838 0%, #0f1219 60%);
 }
 

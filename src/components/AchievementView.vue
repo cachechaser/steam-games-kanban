@@ -28,10 +28,17 @@ const getGamesForColumn = (column) => {
         // Hide hidden games
         if (g.hidden) return false;
         
+        // Exclude games with explicit "No stats" error (and variations)
+        if (g.achievements && g.achievements.error && 
+           (g.achievements.error === 'No stats available' || g.achievements.error.includes('No stats'))) {
+            return false;
+        }
+
         // If no achievements loaded or total is 0, it goes to 0% column
         if (!g.achievements || g.achievements.error || !g.achievements.total) {
             return column.min === 0 && column.max === 0;
         }
+
         const percentage = Math.round((g.achievements.achieved / g.achievements.total) * 100);
         return percentage >= column.min && percentage <= column.max;
     }).sort((a, b) => {
