@@ -5,6 +5,7 @@ import { useSteam } from './composables/useSteam'
 import NavBar from './components/NavBar.vue'
 import BoardView from './components/BoardView.vue'
 import ProfileView from './components/ProfileView.vue'
+import ProfileEditView from './components/ProfileEditView.vue'
 import AchievementView from './components/AchievementView.vue'
 
 const { currentView, navigate } = useRouter()
@@ -14,6 +15,7 @@ const currentComponent = computed(() => {
     switch (currentView.value) {
         case 'Board': return BoardView
         case 'Profile': return ProfileView
+        case 'ProfileEdit': return ProfileEditView
         case 'Achievements': return AchievementView
         default: return BoardView
     }

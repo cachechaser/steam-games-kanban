@@ -10,9 +10,10 @@ const currentView = computed(() => {
   const hash = currentPath.value.slice(1) || '/'
   
   if (hash === '/') return 'Board'
-  if (hash === '/profile/edit') return 'Profile'
+  if (hash === '/profile') return 'Profile'
+  if (hash === '/profile/edit') return 'ProfileEdit'
   if (hash === '/achievements') return 'Achievements'
-  if (hash.startsWith('/profile/edit')) return 'Profile' // handle sub-routes loosely
+  if (hash.startsWith('/profile/edit')) return 'ProfileEdit' 
 
   return 'Board'
 })

@@ -39,7 +39,7 @@ const loginWithSteam = () => {
       </div>
       
       <div class="right-section">
-          <a v-if="state.userProfile" href="#/profile/edit" class="user-profile-link" :class="{ active: isActive('Profile') }">
+          <a v-if="state.userProfile" href="#/profile" class="user-profile-link" :class="{ active: isActive('Profile') || isActive('ProfileEdit') }">
               <div class="user-profile">
                   <span class="username">{{ state.userProfile.personaname }}</span>
                   <img :src="state.userProfile.avatar" alt="Avatar" class="avatar" />
@@ -51,7 +51,7 @@ const loginWithSteam = () => {
           </button>
           
           <div v-else class="setup-msg">
-               <a href="#/profile/edit" class="setup-link" :class="{ active: isActive('Profile') }">
+               <a href="#/profile/edit" class="setup-link" :class="{ active: isActive('ProfileEdit') }">
                    <span class="desktop-text">Complete Setup</span>
                    <span class="mobile-text">Setup</span>
                </a>
