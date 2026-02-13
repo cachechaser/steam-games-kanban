@@ -194,45 +194,45 @@ const goToEdit = () => {
 				<div class="avatar-placeholder">?</div>
 				<h1>Guest</h1>
 			</div>
-			<button @click="goToEdit" class="edit-btn">Edit Profile</button>
+			<button @click="goToEdit" class="btn btn-secondary edit-btn">Edit Profile</button>
 		</div>
 
 		<!-- 🕹️ Hero Grid (Stats) -->
 		<div class="hero-grid">
-			<div class="hero-card">
+			<div class="card-panel card-hover hero-card">
 				<div class="label">Total Games</div>
 				<div class="value">{{ stats.totalGames }}</div>
 				<div class="rank-badge">{{ stats.libraryRank }}</div>
 			</div>
 
-			<div class="hero-card">
+			<div class="card-panel card-hover hero-card">
 				<div class="label">Total Playtime</div>
 				<div class="value">{{ stats.totalPlaytimeHours.toLocaleString() }} <span class="unit">h</span></div>
 				<div class="sub">{{ stats.continuousYears }} Years continuous</div>
 			</div>
 
-			<div class="hero-card">
+			<div class="card-panel card-hover hero-card">
 				<div class="label">Perfect Games</div>
 				<div class="value gold">{{ stats.perfectGames }}</div>
 				<div class="sub">100% Completed</div>
 			</div>
 
-			<div class="hero-card">
+			<div class="card-panel card-hover hero-card">
 				<div class="label">Total Achievements</div>
 				<div class="value blue">{{ stats.totalAchievements.toLocaleString() }}</div>
 				<div class="sub">Unlocked</div>
 			</div>
 
-			<div class="hero-card">
+			<div class="card-panel card-hover hero-card">
 				<div class="label">Completionist Score</div>
 				<div class="gauge-container">
-					<div class="gauge-bg" :style="{ background: `conic-gradient(#66c0f4 ${stats.avgCompletion}%, #2a475e 0)` }">
+					<div class="gauge-bg" :style="{ background: `conic-gradient(var(--steam-blue-light) ${stats.avgCompletion}%, var(--steam-blue-dark) 0)` }">
 						<div class="gauge-inner">{{ stats.avgCompletion }}%</div>
 					</div>
 				</div>
 			</div>
 
-			<div class="hero-card warning">
+			<div class="card-panel card-hover hero-card warning">
 				<div class="label">Pile of Shame</div>
 				<div class="value">{{ stats.pileOfShamePct }}%</div>
 				<div class="progress-bar-bg">
@@ -245,10 +245,10 @@ const goToEdit = () => {
 		<!-- 📊 Visualizations -->
 		<div class="viz-grid">
 			<!-- Backlog Ratio -->
-			<div class="viz-card">
+			<div class="card-panel viz-card">
 				<h3>Backlog Ratio</h3>
 				<div class="donut-chart"
-				     :style="{ background: `conic-gradient(#ff5252 0% ${(stats.unplayed/stats.totalGames)*100}%, #66c0f4 ${(stats.unplayed/stats.totalGames)*100}% ${((stats.unplayed+stats.played)/stats.totalGames)*100}%, #ffc83d ${((stats.unplayed+stats.played)/stats.totalGames)*100}% 100%)` }">
+				     :style="{ background: `conic-gradient(#ff5252 0% ${(stats.unplayed/stats.totalGames)*100}%, var(--steam-blue-light) ${(stats.unplayed/stats.totalGames)*100}% ${((stats.unplayed+stats.played)/stats.totalGames)*100}%, #ffc83d ${((stats.unplayed+stats.played)/stats.totalGames)*100}% 100%)` }">
 					<div class="donut-hole"></div>
 				</div>
 				<div class="legend">
@@ -259,7 +259,7 @@ const goToEdit = () => {
 			</div>
 
 			<!-- Playtime Distribution -->
-			<div class="viz-card wide">
+			<div class="card-panel viz-card wide">
 				<h3>Playtime Distribution</h3>
 				<div class="bar-chart">
 					<div class="bar-group" v-for="(count, label) in stats.timeDist" :key="label">
@@ -272,7 +272,7 @@ const goToEdit = () => {
 			</div>
 
 			<!-- Top 5 Obsessions -->
-			<div class="viz-card wide">
+			<div class="card-panel viz-card wide">
 				<h3>Top 5 Obsessions</h3>
 				<div class="top-list">
 					<div v-for="game in stats.top5" :key="game.appid" class="top-item">
@@ -300,7 +300,7 @@ const goToEdit = () => {
 
 		<div class="lists-grid">
 			<!-- Recently Bingeing -->
-			<div class="list-card">
+			<div class="card-panel list-card">
 				<h3>🔥 Recently Bingeing</h3>
 				<div class="simple-list">
 					<div v-for="game in stats.recent" :key="game.appid" class="list-row">
@@ -315,7 +315,7 @@ const goToEdit = () => {
 			</div>
 
 			<!-- Long Haul -->
-			<div class="list-card">
+			<div class="card-panel list-card">
 				<h3>🏔️ The Long Haul (>500h)</h3>
 				<div class="simple-list">
 					<div v-for="game in stats.longHaul" :key="game.appid" class="list-row">
@@ -327,7 +327,7 @@ const goToEdit = () => {
 			</div>
 
 			<!-- Graveyard -->
-			<div class="list-card">
+			<div class="card-panel list-card">
 				<h3>🪦 The Graveyard (< 2h)</h3>
 				<div class="simple-list">
 					<div v-for="game in stats.graveyard.slice(0, 10)" :key="game.appid" class="list-row muted">
@@ -345,7 +345,7 @@ const goToEdit = () => {
 .dashboard {
 	max-width: 1400px;
 	margin: 0 auto;
-	color: #c7d5e0;
+	color: var(--steam-text-light);
 	animation: fadeIn 0.5s ease-out;
 	overflow-y: auto;
 }
@@ -371,7 +371,7 @@ const goToEdit = () => {
 	border-radius: 8px;
 	margin-bottom: 30px;
 	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-	border-bottom: 2px solid #2a475e;
+	border-bottom: 2px solid var(--steam-blue-dark);
 }
 
 .user-info {
@@ -384,7 +384,7 @@ const goToEdit = () => {
 	width: 80px;
 	height: 80px;
 	border-radius: 8px;
-	border: 2px solid #66c0f4;
+	border: 2px solid var(--steam-blue-light);
 	box-shadow: 0 0 15px rgba(102, 192, 244, 0.2);
 }
 
@@ -396,30 +396,19 @@ const goToEdit = () => {
 
 .member-since {
 	display: block;
-	color: #8f98a0;
+	color: var(--steam-text-muted);
 	font-size: 0.9em;
 	margin: 5px 0;
 }
 
 .steam-link {
-	color: #66c0f4;
+	color: var(--steam-blue-light);
 	text-decoration: none;
 	font-size: 0.9em;
 }
 
 .edit-btn {
-	padding: 10px 20px;
-	background: rgba(255, 255, 255, 0.05);
-	border: 1px solid #66c0f4;
-	color: #66c0f4;
-	border-radius: 4px;
-	cursor: pointer;
-	transition: all 0.2s;
-}
-
-.edit-btn:hover {
-	background: #66c0f4;
-	color: #1b2838;
+	/* Override/Extend default btn styles if needed */
 }
 
 /* Hero Grid */
@@ -431,23 +420,14 @@ const goToEdit = () => {
 }
 
 .hero-card {
-	background: #161920;
 	padding: 20px;
-	border-radius: 8px;
 	text-align: center;
-	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
 	min-height: 140px;
-	border: 1px solid #2a475e;
-	transition: transform 0.2s;
-}
-
-.hero-card:hover {
-	transform: translateY(-5px);
-	border-color: #66c0f4;
+	/* Removed border, shadow, background as they are in card-panel */
 }
 
 .hero-card.warning {
@@ -455,7 +435,7 @@ const goToEdit = () => {
 }
 
 .label {
-	color: #8f98a0;
+	color: var(--steam-text-muted);
 	text-transform: uppercase;
 	font-size: 0.75em;
 	letter-spacing: 1px;
@@ -475,12 +455,12 @@ const goToEdit = () => {
 }
 
 .value.blue {
-	color: #66c0f4;
+	color: var(--steam-blue-light);
 }
 
 .unit {
 	font-size: 1rem;
-	color: #8f98a0;
+	color: var(--steam-text-muted);
 }
 
 .sub {
@@ -490,7 +470,7 @@ const goToEdit = () => {
 }
 
 .rank-badge {
-	background: #66c0f4;
+	background: var(--steam-blue-light);
 	color: #1b2838;
 	padding: 4px 12px;
 	border-radius: 12px;
@@ -551,10 +531,7 @@ const goToEdit = () => {
 }
 
 .viz-card {
-	background: #1b2838;
 	padding: 20px;
-	border-radius: 8px;
-	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
 .viz-card.wide {
@@ -569,9 +546,9 @@ const goToEdit = () => {
 
 h3 {
 	margin: 0 0 15px 0;
-	color: #66c0f4;
+	color: var(--steam-blue-light);
 	font-size: 1.1rem;
-	border-bottom: 1px solid #2a475e;
+	border-bottom: 1px solid var(--steam-blue-dark);
 	padding-bottom: 10px;
 }
 
@@ -632,7 +609,7 @@ h3 {
 
 .bar {
 	width: 40px;
-	background: #66c0f4;
+	background: var(--steam-blue-light);
 	border-radius: 4px 4px 0 0;
 	transition: height 0.5s ease;
 	display: flex;
@@ -651,7 +628,7 @@ h3 {
 .bar-label {
 	margin-top: 10px;
 	font-size: 0.8em;
-	color: #8f98a0;
+	color: var(--steam-text-muted);
 }
 
 /* Top List */
@@ -665,7 +642,7 @@ h3 {
 	position: relative;
 	padding: 15px 20px;
 	border-radius: 4px;
-	border: 1px solid #2a475e;
+	border: 1px solid var(--steam-blue-dark);
 	overflow: hidden;
 	height: 50px; /* Fixed height for consistency */
 	display: flex;
@@ -704,7 +681,7 @@ h3 {
 	background: rgba(0, 0, 0, 0.6);
 	padding: 4px 8px;
 	border-radius: 4px;
-	color: #66c0f4;
+	color: var(--steam-blue-light);
 	font-weight: bold;
 }
 
@@ -758,9 +735,7 @@ h3 {
 }
 
 .list-card {
-	background: #1b2838;
 	padding: 20px;
-	border-radius: 8px;
 }
 
 .simple-list {
@@ -796,7 +771,7 @@ h3 {
 }
 
 .list-row .val {
-	color: #66c0f4;
+	color: var(--steam-blue-light);
 	font-size: 0.9em;
 }
 

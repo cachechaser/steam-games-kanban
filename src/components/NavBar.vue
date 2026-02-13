@@ -69,14 +69,14 @@ const loginWithSteam = () => {
 
 <style scoped>
 .navbar {
-	background: #171a21; /* Steam Dark Blue */
+	background: var(--steam-bg-dark); /* Steam Dark Blue */
 	color: white;
 	height: 60px;
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 	position: sticky;
 	top: 0;
 	z-index: 100;
-	border-bottom: 2px solid #66c0f4; /* Steam Light Blue */
+	border-bottom: 2px solid var(--steam-blue-light); /* Steam Light Blue */
 	display: flex;
 	align-items: center;
 	width: 100%; /* Force full width */
@@ -107,7 +107,7 @@ const loginWithSteam = () => {
 	font-size: 1.5rem;
 	font-weight: 900;
 	letter-spacing: 1px;
-	background: linear-gradient(135deg, #66c0f4 0%, #ffffff 100%);
+	background: linear-gradient(135deg, var(--steam-blue-light) 0%, #ffffff 100%);
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
 	text-decoration: none;
@@ -127,7 +127,7 @@ const loginWithSteam = () => {
 }
 
 .links a {
-	color: #8f98a0;
+	color: var(--steam-text-muted);
 	text-decoration: none;
 	font-weight: 500;
 	padding: 8px 12px;
@@ -144,7 +144,7 @@ const loginWithSteam = () => {
 	left: 0;
 	width: 0%;
 	height: 2px;
-	background: #66c0f4;
+	background: var(--steam-blue-light);
 	transition: width 0.3s;
 }
 
@@ -160,7 +160,7 @@ const loginWithSteam = () => {
 }
 
 .links a.active {
-	color: #66c0f4;
+	color: var(--steam-blue-light);
 	background: rgba(102, 192, 244, 0.15);
 	font-weight: bold;
 	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -191,7 +191,7 @@ const loginWithSteam = () => {
 
 .user-profile-link.active .user-profile {
 	background: rgba(102, 192, 244, 0.2);
-	border-color: #66c0f4;
+	border-color: var(--steam-blue-light);
 	box-shadow: 0 0 10px rgba(102, 192, 244, 0.2);
 }
 
@@ -213,7 +213,7 @@ const loginWithSteam = () => {
 }
 
 .username {
-	color: #c7d5e0;
+	color: var(--steam-text-light);
 	font-weight: bold;
 	font-size: 0.9rem;
 	max-width: 100px;
@@ -226,7 +226,7 @@ const loginWithSteam = () => {
 	width: 32px;
 	height: 32px;
 	border-radius: 50%;
-	border: 2px solid #66c0f4;
+	border: 2px solid var(--steam-blue-light);
 }
 
 .setup-link {
@@ -244,12 +244,12 @@ const loginWithSteam = () => {
 
 .setup-link:hover {
 	background: #ff9900;
-	color: #171a21;
+	color: var(--steam-bg-dark);
 }
 
 .setup-link.active {
 	background: #ff9900;
-	color: #171a21;
+	color: var(--steam-bg-dark);
 	box-shadow: 0 0 10px rgba(255, 153, 0, 0.5);
 }
 

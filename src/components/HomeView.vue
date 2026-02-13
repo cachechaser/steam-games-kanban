@@ -29,34 +29,34 @@ const loginWithSteam = () => {
 		</div>
 
 		<div class="features-grid">
-			<div class="feature-card">
+			<div class="card-panel card-hover feature-card">
 				<div class="icon">📋</div>
 				<h3>Kanban Board</h3>
 				<p>Drag and drop your games between Backlog, Playing, and Completed. Customize your workflow with custom
 					columns.</p>
 			</div>
-			<div class="feature-card">
+			<div class="card-panel card-hover feature-card">
 				<div class="icon">🏆</div>
 				<h3>Achievement Tracking</h3>
 				<p>Visualize your progress - group games by completion percentage and hunt down those
 					100% perfect games.</p>
 			</div>
-			<div class="feature-card">
+			<div class="card-panel card-hover feature-card">
 				<div class="icon">📊</div>
 				<h3>Advanced Analytics</h3>
 				<p>Deep dive into your gaming habits with completion scores, playtime distribution, and backlog ratios.</p>
 			</div>
-			<div class="feature-card">
+			<div class="card-panel card-hover feature-card">
 				<div class="icon">🔍</div>
 				<h3>Library Management</h3>
 				<p>Filter out games - hide the ones you'll never play, and focus on what matters.</p>
 			</div>
-			<div class="feature-card">
+			<div class="card-panel card-hover feature-card">
 				<div class="icon">💻</div>
 				<h3>Keep your data safe</h3>
 				<p>Your browser does all the work! No data will be saved on any server.</p>
 			</div>
-			<div class="feature-card">
+			<div class="card-panel card-hover feature-card">
 				<div class="icon">😉</div>
 				<h3>More to come</h3>
 				<p>I will add more stuff if I need more stuff for my own personal use.</p>
@@ -72,7 +72,7 @@ const loginWithSteam = () => {
 	align-items: center;
 	justify-content: center;
 	min-height: 100%;
-	color: #c7d5e0;
+	color: var(--steam-text-light);
 	box-sizing: border-box;
 	text-align: center;
 	animation: fadeIn 0.8s ease-out;
@@ -97,7 +97,7 @@ const loginWithSteam = () => {
 h1 {
 	font-size: 3.5rem;
 	margin: 0 0 20px 0;
-	background: linear-gradient(135deg, #66c0f4 0%, #ffffff 100%);
+	background: linear-gradient(135deg, var(--steam-blue-light) 0%, #ffffff 100%);
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
 	font-weight: 900;
@@ -105,7 +105,7 @@ h1 {
 
 .subtitle {
 	font-size: 1.5rem;
-	color: #8f98a0;
+	color: var(--steam-text-muted);
 	margin-bottom: 40px;
 	font-weight: 300;
 }
@@ -132,17 +132,8 @@ h1 {
 }
 
 .feature-card {
-	background: rgba(255, 255, 255, 0.03);
 	padding: 30px;
-	border-radius: 12px;
-	border: 1px solid rgba(255, 255, 255, 0.05);
-	transition: transform 0.3s, background 0.3s;
-}
-
-.feature-card:hover {
-	transform: translateY(-5px);
-	background: rgba(255, 255, 255, 0.06);
-	border-color: #66c0f4;
+	/* Removed background, border-radius, border, transition as they are in card-panel/card-hover */
 }
 
 .icon {
@@ -151,13 +142,13 @@ h1 {
 }
 
 h3 {
-	color: #66c0f4;
+	color: var(--steam-blue-light);
 	margin: 0 0 10px 0;
 	font-size: 1.3rem;
 }
 
 p {
-	color: #8f98a0;
+	color: var(--steam-text-muted);
 	line-height: 1.6;
 	margin: 0;
 }

@@ -58,7 +58,7 @@ const refreshStats = async () => {
 	<div class="achievement-view">
 		<div class="header-bar">
 			<h1>Achievement Board</h1>
-			<button @click="refreshStats" :disabled="state.loading" class="reload-btn">
+			<button @click="refreshStats" :disabled="state.loading" class="btn btn-secondary reload-btn">
 				{{ state.loading ? 'Loading Stats...' : '↻ Refresh Stats' }}
 			</button>
 		</div>
@@ -67,14 +67,14 @@ const refreshStats = async () => {
 			<div
 					v-for="col in achievementColumns"
 					:key="col.name"
-					class="column"
+					class="kanban-column column"
 					:style="{ borderTopColor: col.color }"
 			>
 				<div class="column-header">
-					<h2>{{ col.name }} <span class="count">{{ getGamesForColumn(col).length }}</span></h2>
+					<h2>{{ col.name }} <span class="column-count">{{ getGamesForColumn(col).length }}</span></h2>
 				</div>
 				<div class="card-list">
-					<div v-for="game in getGamesForColumn(col)" :key="game.appid" class="card">
+					<div v-for="game in getGamesForColumn(col)" :key="game.appid" class="card-panel card-hover card">
 						<div class="card-header">
 							<img
 									v-if="game.img_icon_url"
@@ -98,7 +98,7 @@ const refreshStats = async () => {
 									     :style="{ width: (game.achievements.achieved / game.achievements.total * 100) + '%', background: col.color }"></div>
 								</div>
 							</div>
-							<button v-else @click="fetchAchievements(game)" :disabled="game.loadingStats" class="small-btn">
+							<button v-else @click="fetchAchievements(game)" :disabled="game.loadingStats" class="btn btn-secondary btn-small small-btn">
 								{{ game.loadingStats ? '...' : 'Load Stats' }}
 							</button>
 						</div>
@@ -141,25 +141,8 @@ const refreshStats = async () => {
 	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-h1 {
-	margin: 0;
-	color: #c7d5e0;
-	font-size: 1.5rem;
-}
-
 .reload-btn {
-	padding: 8px 16px;
-	background: #2a475e;
-	color: white;
-	border: none;
-	border-radius: 4px;
-	cursor: pointer;
-	font-weight: bold;
-	transition: background 0.2s;
-}
-
-.reload-btn:hover {
-	background: #66c0f4;
+	/* Just inheriting */
 }
 
 .board-container {
@@ -175,41 +158,13 @@ h1 {
 .column {
 	flex: 0 0 320px;
 	min-width: 320px;
-	background: #101217;
-	border-radius: 8px;
-	display: flex;
-	flex-direction: column;
-	border-top: 4px solid #66c0f4; /* overridden by inline style */
-	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-	scroll-snap-align: start;
+	border-top: 4px solid var(--steam-blue-light); /* overridden by inline style */
 	transition: transform 0.2s;
-}
-
-.column:hover {
-	transform: translateY(-2px);
+	scroll-snap-align: start;
 }
 
 .column-header {
-	padding: 15px;
-	background: rgba(255, 255, 255, 0.03);
-	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.column h2 {
-	margin: 0;
-	font-size: 1rem;
-	color: #c7d5e0;
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-}
-
-.count {
-	background: rgba(255, 255, 255, 0.1);
-	padding: 2px 8px;
-	border-radius: 12px;
-	font-size: 0.8em;
-	color: #8f98a0;
+	/* Inheriting form global */
 }
 
 .card-list {
@@ -222,13 +177,9 @@ h1 {
 }
 
 .card {
-	background: linear-gradient(145deg, #1b2838, #222b35);
 	padding: 12px;
-	border-radius: 6px;
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-	color: #c7d5e0;
-	border: 1px solid transparent;
-	transition: border-color 0.2s;
+	/* Removed border, shadow, background as they are in card-panel */
+	border: 1px solid transparent; /* Override card-panel? No, card-panel has border. */
 }
 
 .card:hover {
@@ -256,7 +207,7 @@ h1 {
 
 .stats {
 	font-size: 0.85em;
-	color: #8f98a0;
+	color: var(--steam-text-muted);
 	background: rgba(0, 0, 0, 0.2);
 	padding: 8px;
 	border-radius: 4px;
@@ -286,18 +237,7 @@ h1 {
 
 .small-btn {
 	width: 100%;
-	padding: 6px;
-	background: #2a475e;
-	border: none;
-	color: white;
-	border-radius: 4px;
-	cursor: pointer;
-	font-size: 0.9em;
-}
-
-.small-btn:hover {
-	background: #66c0f4;
-	color: #1b2838;
+	/* Removed background colors etc as they are in btn-secondary */
 }
 
 /* Mobile Adjustments */

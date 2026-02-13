@@ -164,17 +164,18 @@ const getColName = (col) => {
 <template>
 	<div class="board-view">
 		<div class="controls-bar">
+			<h1>Your Main Board</h1>
 			<div class="search-box">
-				<input v-model="searchTerm" placeholder="Search games..."/>
+				<input v-model="searchTerm" placeholder="Search games..." class="input-field"/>
 			</div>
 			<div class="actions">
-				<button @click="showFilters = !showFilters" :class="{ active: showFilters }">
+				<button @click="showFilters = !showFilters" class="btn btn-secondary" :class="{ active: showFilters }">
 					<span v-if="showFilters">▼</span><span v-else>►</span> Filters
 				</button>
-				<button @click="openLayoutEditor" class="layout-btn">
+				<button @click="openLayoutEditor" class="btn btn-secondary layout-btn">
 					✎ Edit Board
 				</button>
-				<button @click="refreshStats" :disabled="state.loading" class="reload-stats-btn">
+				<button @click="refreshStats" :disabled="state.loading" class="btn btn-secondary reload-stats-btn">
 					{{ state.loading ? 'Loading Stats...' : '↻ Stats' }}
 				</button>
 			</div>
@@ -198,10 +199,10 @@ const getColName = (col) => {
 				<div class="editor-list">
 					<div v-for="(col, index) in editingColumns" :key="col.id || index" class="editor-row">
 						<div class="row-controls">
-							<button @click="moveColumn(index, -1)" :disabled="index === 0">▲</button>
-							<button @click="moveColumn(index, 1)" :disabled="index === editingColumns.length - 1">▼</button>
+							<button @click="moveColumn(index, -1)" :disabled="index === 0" class="btn btn-small">▲</button>
+							<button @click="moveColumn(index, 1)" :disabled="index === editingColumns.length - 1" class="btn btn-small">▼</button>
 						</div>
-						<input v-model="col.name" placeholder="Name" class="name-input"/>
+						<input v-model="col.name" placeholder="Name" class="input-field name-input"/>
 						<div class="color-picker">
 							<div
 									v-for="color in availableColors"
@@ -212,13 +213,13 @@ const getColName = (col) => {
 									@click="col.color = color"
 							></div>
 						</div>
-						<button @click="removeEditColumn(index)" class="remove-btn">×</button>
+						<button @click="removeEditColumn(index)" class="btn btn-icon remove-btn">×</button>
 					</div>
 				</div>
-				<button @click="addEditColumn" class="add-btn-full">+ Add Column</button>
+				<button @click="addEditColumn" class="btn btn-secondary add-btn-full">+ Add Column</button>
 				<div class="modal-actions">
-					<button @click="showLayoutEditor = false" class="cancel-btn">Cancel</button>
-					<button @click="saveLayout" class="save-btn">Save Changes</button>
+					<button @click="showLayoutEditor = false" class="btn btn-secondary">Cancel</button>
+					<button @click="saveLayout" class="btn btn-primary">Save Changes</button>
 				</div>
 			</div>
 		</div>
@@ -228,7 +229,7 @@ const getColName = (col) => {
 				<div
 						v-for="(col, index) in state.columns"
 						:key="getColName(col)"
-						class="column"
+						class="kanban-column column"
 						:style="{ borderTopColor: getColColor(col) }"
 						@dragover.prevent
 						@dragenter.prevent
@@ -237,7 +238,7 @@ const getColName = (col) => {
 					<div class="column-header">
 						<h2>
 							{{ getColName(col) }}
-							<span class="count">{{ getGamesByStatus(getColName(col)).length }}</span>
+							<span class="column-count">{{ getGamesByStatus(getColName(col)).length }}</span>
 						</h2>
 					</div>
 
@@ -246,12 +247,18 @@ const getColName = (col) => {
 							<div
 									v-for="game in getGamesByStatus(getColName(col))"
 									:key="game.appid"
-									class="card"
+									class="card-panel card-hover card"
 									draggable="true"
 									@dragstart="onDragStart($event, game)"
 							>
 								<div class="card-actions-top">
-									<button @click="toggleHide(game)" class="icon-btn" title="Hide Game">×</button>
+									<button @click="toggleHide(game)" class="hide-btn" title="Hide Game">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                          <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486l.708.709z"/>
+                                          <path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829l.822.822zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/>
+                                          <path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/>
+                                        </svg>
+                                    </button>
 								</div>
 								<div class="card-header">
 									<img
@@ -279,7 +286,7 @@ const getColName = (col) => {
 									<div v-else-if="game.achievements && game.achievements.error" class="stat-error">
 										{{ game.achievements.error }}
 									</div>
-									<button v-else @click="fetchAchievements(game)" :disabled="game.loadingStats" class="small-btn">
+									<button v-else @click="fetchAchievements(game)" :disabled="game.loadingStats" class="btn btn-secondary btn-small">
 										{{ game.loadingStats ? '...' : 'Load Stats' }}
 									</button>
 								</div>
@@ -338,21 +345,7 @@ const getColName = (col) => {
 }
 
 .search-box input {
-	width: 100%;
-	padding: 10px 15px;
-	border-radius: 20px;
-	border: 1px solid #4b6175;
-	background: rgba(0, 0, 0, 0.2);
-	color: #c7d5e0;
-	box-sizing: border-box;
-	transition: all 0.3s;
-}
-
-.search-box input:focus {
-	background: rgba(0, 0, 0, 0.4);
-	border-color: #66c0f4;
-	outline: none;
-	box-shadow: 0 0 10px rgba(102, 192, 244, 0.2);
+	border-radius: 20px; /* Custom override for search */
 }
 
 .actions {
@@ -362,33 +355,13 @@ const getColName = (col) => {
 	flex-wrap: wrap;
 }
 
-.actions button {
-	padding: 8px 16px;
-	background: rgba(255, 255, 255, 0.05);
-	color: #c7d5e0;
-	border: 1px solid rgba(255, 255, 255, 0.1);
-	border-radius: 4px;
-	cursor: pointer;
-	transition: all 0.2s;
-	display: flex;
-	align-items: center;
-	gap: 5px;
-}
-
-.actions button:hover {
-	background: #66c0f4;
-	color: white;
-	border-color: #66c0f4;
-}
-
 .actions button.active {
 	background: #2a475e;
-	border-color: #66c0f4;
-	color: #66c0f4;
+	border-color: var(--steam-blue-light);
+	color: var(--steam-blue-light);
 }
 
 .layout-btn {
-	font-weight: bold;
 	border-color: #a4d007 !important;
 	color: #a4d007 !important;
 }
@@ -399,7 +372,7 @@ const getColName = (col) => {
 }
 
 .reload-stats-btn {
-	font-weight: bold;
+	/* Just inheriting */
 }
 
 .filters-panel {
@@ -409,7 +382,7 @@ const getColName = (col) => {
 	display: flex;
 	gap: 30px;
 	align-items: center;
-	color: #c7d5e0;
+	color: var(--steam-text-light);
 	box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
 	border-top: 1px solid #2a475e;
 	flex-wrap: wrap;
@@ -494,22 +467,15 @@ const getColName = (col) => {
 }
 
 .row-controls button {
-	padding: 0;
 	width: 20px;
 	height: 20px;
 	font-size: 0.6em;
-	display: flex;
-	align-items: center;
-	justify-content: center;
+	padding: 0;
 }
 
 .name-input {
 	flex: 1;
-	padding: 8px;
-	border-radius: 4px;
-	border: 1px solid #4b6175;
-	background: #0f1219;
-	color: white;
+	padding: 8px; /* Override */
 }
 
 .color-picker {
@@ -531,38 +497,21 @@ const getColName = (col) => {
 }
 
 .remove-btn {
-	background: none;
-	border: none;
 	color: #d9534f;
 	font-size: 1.5em;
-	cursor: pointer;
 }
 
 .add-btn-full {
 	width: 100%;
-	padding: 10px;
-	background: rgba(255, 255, 255, 0.05);
-	border: 1px dashed #66c0f4;
-	color: #66c0f4;
 	margin-bottom: 20px;
-	cursor: pointer;
+	border: 1px dashed var(--steam-blue-light);
+	color: var(--steam-blue-light);
 }
 
 .modal-actions {
 	display: flex;
 	justify-content: flex-end;
 	gap: 10px;
-}
-
-.cancel-btn {
-	background: transparent;
-	border: 1px solid #4b6175;
-}
-
-.save-btn {
-	background: #66c0f4;
-	color: #1b2838;
-	font-weight: bold;
 }
 
 .board-container {
@@ -587,12 +536,7 @@ const getColName = (col) => {
 .column {
 	flex: 1 0 320px;
 	min-width: 320px;
-	background: #101217;
-	border-radius: 8px;
-	display: flex;
-	flex-direction: column;
-	border-top: 4px solid #66c0f4; /* Fallback */
-	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+	border-top: 4px solid var(--steam-blue-light); /* Fallback */
 	transition: transform 0.2s, box-shadow 0.2s;
 	scroll-snap-align: center;
 }
@@ -665,39 +609,6 @@ const getColName = (col) => {
 	}
 }
 
-.column:hover {
-	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
-}
-
-.column-header {
-	padding: 15px;
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	background: rgba(255, 255, 255, 0.03);
-	border-radius: 8px 8px 0 0;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.column h2 {
-	margin: 0;
-	font-size: 1.1em;
-	color: #c7d5e0;
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	font-weight: 600;
-	letter-spacing: 0.5px;
-}
-
-.count {
-	background: rgba(255, 255, 255, 0.1);
-	padding: 2px 8px;
-	border-radius: 12px;
-	font-size: 0.8em;
-	color: #8f98a0;
-}
-
 .card-list {
 	flex: 1;
 	padding: 15px;
@@ -708,21 +619,15 @@ const getColName = (col) => {
 }
 
 .card {
-	background: linear-gradient(145deg, #1b2838, #222b35);
+	/* Resetting some specific card overrides if needed */
 	padding: 12px;
-	border-radius: 6px;
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 	cursor: grab;
 	position: relative;
 	border: 1px solid rgba(102, 192, 244, 0.05);
-	color: #c7d5e0;
-	transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+	z-index: 1;
 }
 
 .card:hover {
-	transform: translateY(-4px) scale(1.01);
-	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
-	border-color: #66c0f4;
 	z-index: 10;
 }
 
@@ -736,26 +641,6 @@ const getColName = (col) => {
 
 .card:hover .card-actions-top {
 	opacity: 1;
-}
-
-.icon-btn {
-	background: rgba(0, 0, 0, 0.6);
-	color: #aaa;
-	border: none;
-	width: 20px;
-	height: 20px;
-	border-radius: 50%;
-	cursor: pointer;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 14px;
-	line-height: 1;
-}
-
-.icon-btn:hover {
-	color: white;
-	background: #d9534f;
 }
 
 .card-header {
@@ -782,7 +667,7 @@ const getColName = (col) => {
 
 .stats {
 	font-size: 0.85em;
-	color: #8f98a0;
+	color: var(--steam-text-muted);
 	background: rgba(0, 0, 0, 0.2);
 	padding: 8px;
 	border-radius: 4px;
@@ -796,7 +681,7 @@ const getColName = (col) => {
 }
 
 .percentage {
-	color: #66c0f4;
+	color: var(--steam-blue-light);
 	font-weight: bold;
 }
 
@@ -810,26 +695,8 @@ const getColName = (col) => {
 
 .progress {
 	height: 100%;
-	background: linear-gradient(90deg, #66c0f4, #4c6b22);
+	background: linear-gradient(90deg, var(--steam-blue-light), #4c6b22);
 	transition: width 0.5s ease-out;
-}
-
-.small-btn {
-	padding: 6px 0;
-	font-size: 0.9em;
-	background: rgba(255, 255, 255, 0.05);
-	color: #8f98a0;
-	border: 1px solid rgba(255, 255, 255, 0.1);
-	border-radius: 4px;
-	cursor: pointer;
-	width: 100%;
-	transition: all 0.2s;
-}
-
-.small-btn:hover {
-	background: #66c0f4;
-	color: #1b2838;
-	border-color: #66c0f4;
 }
 
 .stat-error {
