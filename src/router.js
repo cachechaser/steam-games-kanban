@@ -12,7 +12,7 @@ const currentView = computed(() => {
   if (hash === '/') return 'Board'
   if (hash === '/profile') return 'Profile'
   if (hash === '/profile/edit') return 'ProfileEdit'
-  if (hash === '/achievements') return 'Achievements'
+  if (hash === '/completion') return 'Completion'
   if (hash.startsWith('/profile/edit')) return 'ProfileEdit' 
 
   return 'Board'
