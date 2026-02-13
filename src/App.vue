@@ -90,7 +90,7 @@ body {
 }
 
 #app {
-  height: 100%;
+  height: 100vh;
   width: 100%;
 }
 
