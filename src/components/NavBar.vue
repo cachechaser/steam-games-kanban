@@ -31,7 +31,7 @@ const loginWithSteam = () => {
   <nav class="navbar">
     <div class="container">
       <div class="left-section">
-          <a href="#/" class="logo">Steam Kanban</a>
+          <a href="#/" class="logo">Steam Backlog</a>
           <div class="links">
             <a href="#/" :class="{ active: isActive('Board') }">Board</a>
             <a href="#/achievements" :class="{ active: isActive('Achievements') }">Achievements</a>

@@ -1,76 +1,81 @@
 <script setup>
-import { onMounted, computed } from 'vue'
-import { useRouter } from './router'
-import { useSteam } from './composables/useSteam'
+import {onMounted, computed} from 'vue'
+import {useRouter} from './router'
+import {useSteam} from './composables/useSteam'
 import NavBar from './components/NavBar.vue'
 import BoardView from './components/BoardView.vue'
 import ProfileView from './components/ProfileView.vue'
 import ProfileEditView from './components/ProfileEditView.vue'
 import AchievementView from './components/AchievementView.vue'
 
-const { currentView, navigate } = useRouter()
-const { state, loadState, fetchGames } = useSteam()
+const {currentView, navigate} = useRouter()
+const {state, loadState, fetchGames} = useSteam()
 
 const currentComponent = computed(() => {
-    switch (currentView.value) {
-        case 'Board': return BoardView
-        case 'Profile': return ProfileView
-        case 'ProfileEdit': return ProfileEditView
-        case 'Achievements': return AchievementView
-        default: return BoardView
-    }
+  switch (currentView.value) {
+    case 'Board':
+      return BoardView
+    case 'Profile':
+      return ProfileView
+    case 'ProfileEdit':
+      return ProfileEditView
+    case 'Achievements':
+      return AchievementView
+    default:
+      return BoardView
+  }
 })
 
 // Helper to get query params
 const getQueryParams = () => {
-    const params = new URLSearchParams(window.location.search);
-    return params;
+  const params = new URLSearchParams(window.location.search);
+  return params;
 }
 
 const checkOpenIdReturn = async () => {
-    const params = getQueryParams();
-    const claimedId = params.get('openid.claimed_id');
-    if (claimedId) {
-        // ID looks like https://steamcommunity.com/openid/id/76561198000000000
-        const parts = claimedId.split('/');
-        let id = parts.pop();
-        if (!id) id = parts.pop();
-        
-        if (id && /^\d+$/.test(id)) {
-            state.steamId = id;
-            // Save immediately
-            localStorage.setItem('steam_kanban_state', JSON.stringify({ ...state, steamId: id }))
-            
-            // Navigate to Profile to verify/add API key
-            navigate('#/profile/edit');
-            
-            // Clean URL from query params
-            window.history.replaceState({}, document.title, window.location.pathname + '#/profile/edit');
-            
-            // If we have API key (maybe from previous session), fetch games
-            if (state.apiKey) {
-                await fetchGames();
-            }
-            return true;
-        }
+  const params = getQueryParams();
+  const claimedId = params.get('openid.claimed_id');
+  if (claimedId) {
+    // ID looks like https://steamcommunity.com/openid/id/76561198000000000
+    const parts = claimedId.split('/');
+    let id = parts.pop();
+    if (!id) id = parts.pop();
+
+    if (id && /^\d+$/.test(id)) {
+      state.steamId = id;
+      // Save immediately
+      localStorage.setItem('steam_kanban_state', JSON.stringify({...state, steamId: id}))
+
+      // Navigate to Profile to verify/add API key
+      navigate('#/profile/edit');
+
+      // Clean URL from query params
+      window.history.replaceState({}, document.title, window.location.pathname + '#/profile/edit');
+
+      // If we have API key (maybe from previous session), fetch games
+      if (state.apiKey) {
+        await fetchGames();
+      }
+      return true;
     }
-    return false;
+  }
+  return false;
 }
 
 onMounted(async () => {
-    loadState()
-    await checkOpenIdReturn()
+  loadState()
+  await checkOpenIdReturn()
 })
 </script>
 
 <template>
   <div class="app-container">
-    <NavBar />
+    <NavBar/>
     <main class="main-content">
       <div class="content-wrapper">
-          <transition name="fade" mode="out-in">
-            <component :is="currentComponent" />
-          </transition>
+        <transition name="fade" mode="out-in">
+          <component :is="currentComponent"/>
+        </transition>
       </div>
     </main>
   </div>
@@ -104,7 +109,7 @@ body {
 
 .main-content {
   flex: 1;
-  padding: 0; 
+  padding: 0;
   overflow: hidden; /* Prevent body scroll, views handle scrolling */
   width: 100%;
   display: flex;
@@ -113,42 +118,42 @@ body {
 }
 
 .content-wrapper {
-    width: 100%;
-    height: 100%;
-    background: transparent; 
-    display: flex;
-    flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
 }
 
 .content-wrapper > * {
-    background: transparent;
-    height: 100%;
-    width: 100%;
-    overflow: hidden; /* Default to hidden, specific views define scrolling */
-    padding: 0; /* Let views decide padding */
-    box-sizing: border-box;
+  background: transparent;
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* Default to hidden, specific views define scrolling */
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 /* Global Button Animations */
 button {
-    font-family: inherit;
-    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  font-family: inherit;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 button:not(:disabled):hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  filter: brightness(1.1);
 }
 
 button:not(:disabled):active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* Scrollbar */
@@ -158,26 +163,26 @@ button:disabled {
 }
 
 ::-webkit-scrollbar-track {
-  background: #171a21; 
+  background: #171a21;
 }
- 
+
 ::-webkit-scrollbar-thumb {
-  background: #2a475e; 
+  background: #2a475e;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #66c0f4; 
+  background: #66c0f4;
 }
 
 a {
-    color: #66c0f4;
-    text-decoration: none;
-    transition: color 0.2s;
+  color: #66c0f4;
+  text-decoration: none;
+  transition: color 0.2s;
 }
 
 a:hover {
-    color: white;
+  color: white;
 }
 
 /* Transitions */
@@ -189,5 +194,11 @@ a:hover {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 768px) {
+  .content-wrapper > * {
+    padding: 12px;
+  }
 }
 </style>

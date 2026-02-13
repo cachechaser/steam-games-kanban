@@ -113,7 +113,6 @@ const refreshStats = async () => {
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 20px;
     box-sizing: border-box;
     width: 100%;
     animation: fadeIn 0.5s ease-out;
@@ -296,10 +295,6 @@ h1 {
 
 /* Mobile Adjustments */
 @media (max-width: 768px) {
-    .achievement-view {
-        padding: 10px;
-    }
-    
     .header-bar {
         flex-direction: column;
         gap: 10px;
