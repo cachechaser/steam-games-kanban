@@ -16,11 +16,9 @@ Stop scrolling listlessly through your library. Start completing your backlog.
   needs some work.**
 - **Hide Games you don't want to play**: Game is too tough to complete, achievements are
   impossible, servers are down or the game is just trash? Well, hide it application-wide! You can unhide them later.
-- **Achievement Integration
-  **: Automatically fetches your achievement progress for every game. See exactly how close you are to 100% completion without leaving the board.
+- **Achievement Integration**: Automatically fetches your achievement progress for every game. See exactly how close you are to 100% completion without leaving the board.
 - **Trophy Case**: A dedicated showcase for games you have perfected (100% achievements).
-- **Privacy First
-  **: All data, including your API key and board layout, is stored locally in your browser. No external servers track your gaming habits.
+- **Privacy First**: All data, including your API key and board layout, is stored locally in your browser. No external servers track your gaming habits.
 
 ---
 
