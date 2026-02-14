@@ -70,8 +70,7 @@ const loginWithSteam = () => {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	justify-content: center;
-	min-height: 100%;
+	overflow-y: auto;
 	color: var(--steam-text-light);
 	box-sizing: border-box;
 	text-align: center;
