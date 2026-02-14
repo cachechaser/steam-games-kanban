@@ -3,7 +3,7 @@ import {computed, onMounted, reactive} from 'vue'
 import {useSteam} from '../composables/useSteam'
 import {useRouter} from '../router'
 
-const {state, loadState, fetchAllAchievements} = useSteam()
+const {state, loadState, fetchAllAchievementsDetailed, getCompletionData} = useSteam()
 const {navigate} = useRouter()
 
 const failedHeaders = reactive(new Set())
@@ -15,8 +15,11 @@ onMounted(async () => {
 	// Ensure stats are loaded
 	const now = Date.now()
 	const lastUpdate = state.lastUpdated || 0
-	if (state.games.length > 0 && (now - lastUpdate > 172800000)) {
-		await fetchAllAchievements()
+
+	const hasStats = state.games.some(g => g.achievementsList && g.achievementsList.achievements && g.achievementsList.achievements.length > 0)
+
+	if (state.games.length > 0 && (now - lastUpdate > 172800000 || !hasStats)) {
+		await fetchAllAchievementsDetailed()
 	}
 })
 
@@ -75,13 +78,15 @@ const stats = computed(() => {
 		}
 
 		// Achievements
-		if (g.achievements && !g.achievements.error && g.achievements.total > 0) {
-			totalAchievements += g.achievements.achieved;
-			const pct = g.achievements.achieved / g.achievements.total;
+		const achData = getCompletionData(g)
+
+		if (achData && !achData.error && achData.total > 0) {
+			totalAchievements += achData.achieved;
+			const pct = achData.achieved / achData.total;
 			achievementSum += pct;
 			achievementCount++;
 
-			if (g.achievements.achieved === g.achievements.total) {
+			if (achData.achieved === achData.total) {
 				perfectGames++;
 				completed++;
 			} else if (playtime > 0) {
@@ -116,9 +121,10 @@ const stats = computed(() => {
 			}));
 
 	// Trophy Case (Perfect Games)
-	const trophyCase = games.filter(g =>
-			g.achievements && !g.achievements.error && g.achievements.total > 0 && g.achievements.achieved === g.achievements.total
-	);
+	const trophyCase = games.filter(g => {
+	        const achData = getCompletionData(g)
+			return achData && !achData.error && achData.total > 0 && achData.achieved === achData.total
+    });
 
 	// Graveyard (< 2h played, > 0)
 	const graveyard = games.filter(g => {
@@ -135,7 +141,8 @@ const stats = computed(() => {
 	// Long Haul (>500h, not perfect)
 	const longHaul = games.filter(g => {
 		const pt = g.playtime_forever || 0;
-		const isPerf = g.achievements && g.achievements.achieved === g.achievements.total;
+		const achData = getCompletionData(g)
+		const isPerf = achData && achData.achieved === achData.total;
 		return pt > 30000 && !isPerf;
 	}).sort((a, b) => b.playtime_forever - a.playtime_forever);
 

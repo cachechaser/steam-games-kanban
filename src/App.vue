@@ -8,6 +8,7 @@ import BoardView from './components/BoardView.vue'
 import ProfileView from './components/ProfileView.vue'
 import ProfileEditView from './components/ProfileEditView.vue'
 import CompletionView from './components/CompletionView.vue'
+import AchievementView from './components/AchievementView.vue'
 import HomeView from './components/HomeView.vue'
 
 const {currentView, navigate} = useRouter()
@@ -33,6 +34,8 @@ const currentComponent = computed(() => {
 			return ProfileEditView
 		case 'Completion':
 			return CompletionView
+		case 'Achievements':
+			return AchievementView
 		default:
 			return BoardView
 	}

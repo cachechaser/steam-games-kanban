@@ -34,6 +34,7 @@ const loginWithSteam = () => {
 				<a href="#/" class="logo">Steam Backlog</a>
 				<div class="links" v-if="state.steamId">
 					<a href="#/" :class="{ active: isActive('Board') }">Board</a>
+					<a href="#/achievements" :class="{ active: isActive('Achievements') }">Achievements</a>
 					<a href="#/completion" :class="{ active: isActive('Completion') }">Completion</a>
 				</div>
 			</div>

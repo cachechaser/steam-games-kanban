@@ -2,7 +2,7 @@
 import {ref, computed, onMounted, watch, nextTick} from 'vue'
 import {useSteam} from '../composables/useSteam'
 
-const {state, loadState, fetchAchievements, fetchAllAchievements, addColumn, removeColumn, fetchGames} = useSteam()
+const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed, fetchGameDetails, addColumn, removeColumn, getCompletionData} = useSteam()
 
 const searchTerm = ref('')
 const showFilters = ref(false)
@@ -17,15 +17,16 @@ const availableColors = ['#66c0f4', '#a4d007', '#ffc83d', '#ff5252', '#be5eff', 
 
 onMounted(async () => {
 	loadState()
-	if (state.games.length === 0 && state.steamId && state.apiKey) {
-		await fetchGames()
-	}
 
 	const now = Date.now()
 	const lastUpdate = state.lastUpdated || 0
-	if (state.games.length > 0 && (now - lastUpdate > 172800000)) {
-		console.log('Auto-refreshing achievements...')
-		await fetchAllAchievements()
+
+	// Check if any game has detailed achievement data loaded
+	const hasStats = state.games.some(g => g.achievementsList && g.achievementsList.achievements && g.achievementsList.achievements.length > 0)
+
+	// Auto-load if stale > 48h
+	if (state.games.length > 0 && (now - lastUpdate > 172800000 || !hasStats)) {
+		await fetchAllAchievementsDetailed()
 	}
 })
 
@@ -36,13 +37,18 @@ const filteredGames = computed(() => {
 		result = result.filter(g => g.name.toLowerCase().includes(lower))
 	}
 	result = result.filter(g => !g.hidden)
+
 	if (hideNoAchievements.value) {
-		result = result.filter(g => g.achievements && g.achievements.total > 0)
+		result = result.filter(g => {
+		    const stats = getCompletionData(g)
+		    return stats.total > 0
+		})
 	}
 	if (filterCompletion.value > 0) {
 		result = result.filter(g => {
-			if (!g.achievements || !g.achievements.total) return false
-			return (g.achievements.achieved / g.achievements.total * 100) >= filterCompletion.value
+		    const stats = getCompletionData(g)
+			if (!stats.total) return false
+			return (stats.achieved / stats.total * 100) >= filterCompletion.value
 		})
 	}
 	if (hideFree.value) {
@@ -74,7 +80,7 @@ const toggleHide = (game) => {
 }
 
 const refreshStats = async () => {
-	await fetchAllAchievements(true)
+	await refreshLibrary()
 }
 
 // Layout Editor Logic
@@ -117,8 +123,6 @@ const moveColumn = (index, direction) => {
 }
 
 const saveLayout = () => {
-	// Logic to handle renamed/removed columns for existing games
-	// 1. Identify removed columns
 	const newNames = new Set(editingColumns.value.map(c => c.name));
 	const oldColumns = state.columns.map(c => typeof c === 'string' ? c : c.name);
 
@@ -133,14 +137,6 @@ const saveLayout = () => {
 		});
 	}
 
-	// 2. Update state
-	// Store simple names in state.columns if we want to keep backward compat, or objects?
-	// User requested deciding colors. So we MUST store objects now.
-	// Migration: We'll store objects.
-	// BUT: getGamesByStatus uses g.status which is a string (name).
-	// So state.columns will be array of objects, but we match by name.
-
-	// Ensure uniqueness of names
 	const names = editingColumns.value.map(c => c.name);
 	if (new Set(names).size !== names.length) {
 		alert("Column names must be unique");
@@ -176,7 +172,7 @@ const getColName = (col) => {
 					✎ Edit Board
 				</button>
 				<button @click="refreshStats" :disabled="state.loading" class="btn btn-secondary reload-stats-btn">
-					{{ state.loading ? 'Loading Stats...' : '↻ Stats' }}
+					{{ state.loading ? 'Syncing...' : '↻ Sync Library' }}
 				</button>
 			</div>
 		</div>
@@ -271,23 +267,23 @@ const getColName = (col) => {
 								</div>
 
 								<div class="stats">
-									<div v-if="game.achievements && !game.achievements.error">
+									<div v-if="getCompletionData(game).total > 0">
 										<div class="achievement-text">
-											<span>{{ game.achievements.achieved }} / {{ game.achievements.total }}</span>
+											<span>{{ getCompletionData(game).achieved }} / {{ getCompletionData(game).total }}</span>
 											<span class="percentage">{{
-													Math.round(game.achievements.achieved / game.achievements.total * 100)
+													Math.round(getCompletionData(game).achieved / getCompletionData(game).total * 100)
 												}}%</span>
 										</div>
 										<div class="progress-bar">
 											<div class="progress"
-											     :style="{ width: (game.achievements.achieved / game.achievements.total * 100) + '%', background: getColColor(col) }"></div>
+											     :style="{ width: (getCompletionData(game).achieved / getCompletionData(game).total * 100) + '%', background: getColColor(col) }"></div>
 										</div>
 									</div>
-									<div v-else-if="game.achievements && game.achievements.error" class="stat-error">
-										{{ game.achievements.error }}
+									<div v-else-if="getCompletionData(game).error" class="stat-error">
+										{{ getCompletionData(game).error }}
 									</div>
-									<button v-else @click="fetchAchievements(game)" :disabled="game.loadingStats" class="btn btn-secondary btn-small">
-										{{ game.loadingStats ? '...' : 'Load Stats' }}
+									<button v-else @click="fetchGameDetails(game)" :disabled="game.loadingDetails" class="btn btn-secondary btn-small">
+										{{ game.loadingDetails ? '...' : 'Load Stats' }}
 									</button>
 								</div>
 							</div>
