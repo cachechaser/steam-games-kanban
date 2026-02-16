@@ -1,8 +1,8 @@
 <script setup>
-import {ref, computed, onMounted, watch, nextTick} from 'vue'
+import {ref, computed, onMounted, reactive} from 'vue'
 import {useSteam} from '../composables/useSteam'
 
-const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed, fetchGameDetails, addColumn, removeColumn, getCompletionData} = useSteam()
+const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed, fetchGameDetails, getCompletionData} = useSteam()
 
 const searchTerm = ref('')
 const showFilters = ref(false)
@@ -14,6 +14,24 @@ const hideFree = ref(false)
 // Layout Editor State
 const editingColumns = ref([])
 const availableColors = ['#66c0f4', '#a4d007', '#ffc83d', '#ff5252', '#be5eff', '#ffffff']
+
+// DOM Refs
+const boardContainerRef = ref(null)
+
+// Touch Drag State
+const touchState = reactive({
+	active: false,
+	game: null,
+	timer: null,
+	initialX: 0,
+	initialY: 0,
+	element: null, // The clone
+	offsetX: 0,
+	offsetY: 0,
+    scrollDirection: 0
+})
+
+let scrollTimer = null;
 
 onMounted(async () => {
 	loadState()
@@ -73,6 +91,150 @@ const onDrop = (evt, status) => {
 	if (game) {
 		game.status = status
 	}
+}
+
+// --- Touch Drag Logic ---
+const onTouchStart = (evt, game) => {
+	// Only start if one finger
+	if (evt.touches.length > 1) return
+
+	touchState.initialX = evt.touches[0].clientX
+	touchState.initialY = evt.touches[0].clientY
+	touchState.game = game
+	
+	// Start timer for long press (reduced to 200ms for responsiveness)
+	touchState.timer = setTimeout(() => {
+		startTouchDrag(evt)
+	}, 200) 
+}
+
+const onTouchMove = (evt) => {
+	if (touchState.active) {
+		if (evt.cancelable) evt.preventDefault() // Prevent scrolling
+		const touch = evt.touches[0]
+		if (touchState.element) {
+			touchState.element.style.left = (touch.clientX - touchState.offsetX) + 'px'
+			touchState.element.style.top = (touch.clientY - touchState.offsetY) + 'px'
+			
+			// Auto Scroll Logic
+			handleAutoScroll(touch.clientX);
+		}
+	} else {
+		// Cancel timer if moved significantly before activation
+		const dx = Math.abs(evt.touches[0].clientX - touchState.initialX)
+		const dy = Math.abs(evt.touches[0].clientY - touchState.initialY)
+		if (dx > 10 || dy > 10) {
+			clearTimeout(touchState.timer)
+		}
+	}
+}
+
+const handleAutoScroll = (x) => {
+    if (!boardContainerRef.value) return;
+    
+    const container = boardContainerRef.value;
+    const threshold = 80; // Larger threshold for mobile
+    const speed = 15; // Scroll speed
+    const rect = container.getBoundingClientRect();
+    
+    let direction = 0;
+    if (x < rect.left + threshold) {
+        direction = -1;
+    } else if (x > rect.right - threshold) {
+        direction = 1;
+    }
+
+    if (direction === 0) {
+        stopScrolling();
+        return;
+    }
+
+    if (touchState.scrollDirection !== direction) {
+        stopScrolling();
+        touchState.scrollDirection = direction;
+        
+        const scrollStep = () => {
+            if (touchState.scrollDirection !== 0 && boardContainerRef.value) {
+                boardContainerRef.value.scrollLeft += (speed * touchState.scrollDirection);
+            }
+        };
+        
+        scrollTimer = setInterval(scrollStep, 16);
+    }
+}
+
+const onTouchEnd = (evt) => {
+	clearTimeout(touchState.timer)
+    stopScrolling();
+	if (touchState.active) {
+		// Find drop target
+		const touch = evt.changedTouches[0]
+		
+		// Hide ghost momentarily to find element underneath
+		touchState.element.style.display = 'none'
+		const target = document.elementFromPoint(touch.clientX, touch.clientY)
+		touchState.element.style.display = 'block' 
+
+		// Traverse up to find a column with data-status
+		const col = target?.closest('.kanban-column')
+		if (col) {
+			const status = col.getAttribute('data-status')
+			if (status && touchState.game) {
+				touchState.game.status = status
+			}
+		}
+		
+		stopTouchDrag()
+	}
+}
+
+const startTouchDrag = (evt) => {
+	touchState.active = true
+	// Create ghost element
+	const original = evt.target.closest('.card')
+	if (!original) return
+
+	// Calculate offset so we hold it where we touched it
+	const rect = original.getBoundingClientRect()
+	touchState.offsetX = evt.touches[0].clientX - rect.left
+	touchState.offsetY = evt.touches[0].clientY - rect.top
+
+	// Clone
+	const clone = original.cloneNode(true)
+	clone.style.position = 'fixed'
+	clone.style.width = rect.width + 'px'
+	clone.style.height = rect.height + 'px'
+	clone.style.left = rect.left + 'px'
+	clone.style.top = rect.top + 'px'
+	clone.style.zIndex = '9999'
+	clone.style.opacity = '0.9'
+	clone.style.pointerEvents = 'none' // Important to click through
+	clone.style.transform = 'scale(1.05)'
+	clone.style.boxShadow = '0 10px 20px rgba(0,0,0,0.5)'
+	
+	document.body.appendChild(clone)
+	touchState.element = clone
+	
+	// Vibrate if available
+	if (navigator.vibrate) navigator.vibrate(50)
+}
+
+const stopTouchDrag = () => {
+	touchState.active = false
+	if (touchState.element) {
+		document.body.removeChild(touchState.element)
+		touchState.element = null
+	}
+	touchState.game = null
+    stopScrolling();
+}
+
+const stopScrolling = () => {
+    if (scrollTimer) {
+        clearInterval(scrollTimer);
+        scrollTimer = null;
+    }
+    touchState.scrollDirection = 0;
 }
 
 const toggleHide = (game) => {
@@ -220,13 +382,18 @@ const getColName = (col) => {
 			</div>
 		</div>
 
-		<div class="board-container">
+		<div 
+            class="board-container" 
+            ref="boardContainerRef" 
+            :class="{ 'is-dragging': touchState.active }"
+        >
 			<transition-group name="column-list" tag="div" class="board-flex">
 				<div
 						v-for="(col, index) in state.columns"
 						:key="getColName(col)"
 						class="kanban-column column"
 						:style="{ borderTopColor: getColColor(col) }"
+						:data-status="getColName(col)"
 						@dragover.prevent
 						@dragenter.prevent
 						@drop="onDrop($event, getColName(col))"
@@ -246,6 +413,9 @@ const getColName = (col) => {
 									class="card-panel card-hover card"
 									draggable="true"
 									@dragstart="onDragStart($event, game)"
+									@touchstart="onTouchStart($event, game)"
+									@touchmove="onTouchMove($event)"
+									@touchend="onTouchEnd($event)"
 							>
 								<div class="card-actions-top">
 									<button @click="toggleHide(game)" class="hide-btn" title="Hide Game">
@@ -518,6 +688,11 @@ const getColName = (col) => {
 	-webkit-overflow-scrolling: touch;
 	scroll-snap-type: x mandatory;
 	width: 100%;
+}
+
+/* Disable scroll snap while dragging to allow smooth auto-scroll */
+.board-container.is-dragging {
+    scroll-snap-type: none;
 }
 
 .board-flex {
