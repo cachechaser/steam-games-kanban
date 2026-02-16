@@ -260,7 +260,6 @@ onMounted(async () => {
 		                    Game
 		                    <span class="sort-icon">{{ sortBy === 'gameName' ? (sortDesc ? '▼' : '▲') : '' }}</span>
 		                </th>
-		                <th class="col-icon">Icon</th>
 		                <th @click="handleSort('achName')" :class="{sorted: sortBy === 'achName'}">
 		                    Achievement
 		                    <span class="sort-icon">{{ sortBy === 'achName' ? (sortDesc ? '▼' : '▲') : '' }}</span>
@@ -270,14 +269,14 @@ onMounted(async () => {
 		                    <span class="sort-icon">{{ sortBy === 'unlockRate' ? (sortDesc ? '▼' : '▲') : '' }}</span>
 		                </th>
 		                <th @click="handleSort('unlockDate')" :class="{sorted: sortBy === 'unlockDate'}" class="text-right">
-		                    Unlocked
+		                    Unlock Date
 		                    <span class="sort-icon">{{ sortBy === 'unlockDate' ? (sortDesc ? '▼' : '▲') : '' }}</span>
 		                </th>
 		            </tr>
 		        </thead>
 		        <tbody>
 		            <tr v-if="paginatedAchievements.length === 0">
-		                <td colspan="5" class="empty-state">
+		                <td colspan="4" class="empty-state">
 		                    {{ loading && allAchievements.length === 0 ? 'Loading data...' : 'No achievements found matching filters.' }}
 		                </td>
 		            </tr>
@@ -287,12 +286,14 @@ onMounted(async () => {
 		                        <span class="game-name">{{ ach.gameName }}</span>
 		                    </div>
 		                </td>
-		                <td class="icon-cell">
-		                    <img :src="getIconUrl(ach)" class="ach-img" alt="" loading="lazy" />
-		                </td>
 		                <td class="desc-cell">
-		                    <div class="ach-title">{{ ach.name }}</div>
-		                    <div class="ach-desc">{{ ach.description }}</div>
+		                    <div class="ach-content-wrapper">
+    		                    <img :src="getIconUrl(ach)" class="ach-img" alt="" loading="lazy" />
+    		                    <div class="ach-text">
+        		                    <div class="ach-title">{{ ach.name }}</div>
+        		                    <div class="ach-desc">{{ ach.description }}</div>
+    		                    </div>
+		                    </div>
 		                </td>
 		                <td class="rate-cell">
 		                    <span class="rate-badge">{{ ach.unlockPercentage.toFixed(1) }}%</span>
@@ -563,9 +564,10 @@ onMounted(async () => {
     text-overflow: ellipsis;
 }
 
-.icon-cell {
-    width: 50px;
-    text-align: center;
+.ach-content-wrapper {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
 }
 
 .ach-img {
@@ -573,10 +575,16 @@ onMounted(async () => {
     height: 48px;
     border-radius: 4px;
     background: rgba(0,0,0,0.3);
+    flex-shrink: 0;
+}
+
+.ach-text {
+    flex: 1;
+    min-width: 0; /* Enable text truncation */
 }
 
 .desc-cell {
-    width: 45%;
+    width: 50%;
 }
 
 .ach-title {
