@@ -440,7 +440,7 @@ const getColName = (col) => {
 									<div v-if="getCompletionData(game).total > 0">
 										<div class="achievement-text">
 											<span>{{ getCompletionData(game).achieved }} / {{ getCompletionData(game).total }}</span>
-											<span class="percentage">{{
+											<span class="percentage" :style="{ color: col.color }">{{
 													Math.round(getCompletionData(game).achieved / getCompletionData(game).total * 100)
 												}}%</span>
 										</div>
