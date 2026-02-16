@@ -256,7 +256,7 @@ onMounted(async () => {
 		    <table class="ach-table">
 		        <thead>
 		            <tr>
-		                <th @click="handleSort('gameName')" :class="{sorted: sortBy === 'gameName'}">
+		                <th @click="handleSort('gameName')" :class="['game-cell', {sorted: sortBy === 'gameName'}]">
 		                    Game
 		                    <span class="sort-icon">{{ sortBy === 'gameName' ? (sortDesc ? '▼' : '▲') : '' }}</span>
 		                </th>
