@@ -112,7 +112,7 @@ const pageInfo = computed(() => {
 })
 
 const availableColumns = computed(() => {
-	return state.columns
+	return state.columns.map(c => typeof c === 'object' ? c.name : c)
 })
 
 // Methods
