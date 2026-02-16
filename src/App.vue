@@ -162,6 +162,24 @@ p {
 	box-sizing: border-box;
 }
 
+.header-bar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 15px 25px;
+	background: rgba(0, 0, 0, 0.2);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	flex-shrink: 0;
+}
+
+.column {
+	flex: 1 0 320px;
+	min-width: 320px;
+	border-top: 4px solid var(--steam-blue-light); /* Fallback */
+	transition: transform 0.2s, box-shadow 0.2s;
+	scroll-snap-align: center;
+}
+
 /* --- Global UI Components --- */
 
 /* Buttons */
@@ -384,6 +402,20 @@ a:hover {
 @media (max-width: 768px) {
 	.content-wrapper > * {
 		padding: 12px;
+	}
+
+	.header-bar {
+		flex-direction: column;
+		gap: 10px;
+		align-items: stretch;
+		text-align: center;
+	}
+
+	.column {
+		flex: 0 0 85vw;
+		width: 85vw;
+		min-width: 280px;
+		scroll-snap-align: center;
 	}
 }
 </style>

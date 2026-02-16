@@ -704,13 +704,6 @@ const getColName = (col) => {
 	padding-right: 20px;
 }
 
-.column {
-	flex: 1 0 320px;
-	min-width: 320px;
-	border-top: 4px solid var(--steam-blue-light); /* Fallback */
-	transition: transform 0.2s, box-shadow 0.2s;
-	scroll-snap-align: center;
-}
 
 /* Mobile Adjustments */
 @media (max-width: 768px) {
@@ -753,14 +746,7 @@ const getColName = (col) => {
 		width: 100%;
 		min-width: 100%;
 	}
-
-	.column {
-		flex: 0 0 85vw;
-		width: 85vw;
-		min-width: 280px;
-		scroll-snap-align: center;
-	}
-
+	
 	.board-flex {
 		padding-right: 15px;
 		gap: 15px;

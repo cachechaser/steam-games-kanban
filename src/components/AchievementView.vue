@@ -346,22 +346,10 @@ onMounted(async () => {
 	overflow: hidden;
 }
 
-/* Header */
-.header-bar {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding: 15px 25px;
-	background: rgba(0, 0, 0, 0.2);
-	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-	flex-shrink: 0;
-}
-
 .header-title h1 {
 	display: inline-block;
-	margin: 0;
 	font-size: 1.5rem;
-	margin-right: 15px;
+	margin: 0 15px 0 0;
 }
 
 .results-count {

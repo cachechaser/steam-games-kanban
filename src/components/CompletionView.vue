@@ -146,6 +146,7 @@ const getGamesForColumn = (column) => {
 	box-sizing: border-box;
 	width: 100%;
 	animation: fadeIn 0.5s ease-out;
+	gap: 15px;
 }
 
 @keyframes fadeIn {
@@ -157,17 +158,6 @@ const getGamesForColumn = (column) => {
 		opacity: 1;
 		transform: translateY(0);
 	}
-}
-
-.header-bar {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 20px;
-	background: rgba(0, 0, 0, 0.2);
-	padding: 10px 20px;
-	border-radius: 8px;
-	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .reload-btn {
@@ -182,14 +172,6 @@ const getGamesForColumn = (column) => {
 	overflow-y: hidden;
 	padding-bottom: 10px;
 	scroll-snap-type: x mandatory;
-}
-
-.column {
-	flex: 0 0 320px;
-	min-width: 320px;
-	border-top: 4px solid var(--steam-blue-light); /* overridden by inline style */
-	transition: transform 0.2s;
-	scroll-snap-align: start;
 }
 
 .column-header {
@@ -274,21 +256,5 @@ const getGamesForColumn = (column) => {
     font-size: 0.8em;
     font-style: italic;
     text-align: center;
-}
-
-/* Mobile Adjustments */
-@media (max-width: 768px) {
-	.header-bar {
-		flex-direction: column;
-		gap: 10px;
-		align-items: stretch;
-		text-align: center;
-	}
-
-	.column {
-		flex: 0 0 85vw;
-		width: 85vw;
-		min-width: 280px;
-	}
 }
 </style>
