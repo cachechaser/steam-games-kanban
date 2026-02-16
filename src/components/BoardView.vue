@@ -2,7 +2,7 @@
 import {ref, computed, onMounted, reactive} from 'vue'
 import {useSteam} from '../composables/useSteam'
 
-const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed, fetchGameDetails, getCompletionData} = useSteam()
+const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed, fetchGameDetails, getCompletionData, updateGameStatus} = useSteam()
 
 const searchTerm = ref('')
 const showFilters = ref(false)
@@ -89,7 +89,7 @@ const onDrop = (evt, status) => {
 	const gameId = evt.dataTransfer.getData('gameId')
 	const game = state.games.find(g => g.appid.toString() === gameId)
 	if (game) {
-		game.status = status
+        updateGameStatus(game, status)
 	}
 }
 
@@ -180,7 +180,7 @@ const onTouchEnd = (evt) => {
 		if (col) {
 			const status = col.getAttribute('data-status')
 			if (status && touchState.game) {
-				touchState.game.status = status
+				updateGameStatus(touchState.game, status)
 			}
 		}
 		

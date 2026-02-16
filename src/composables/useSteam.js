@@ -1,4 +1,4 @@
-import { ref, computed, watch, reactive } from 'vue'
+import { ref, computed, watch, reactive, toRaw } from 'vue'
 
 const STATE_KEY = 'steam_kanban_state'
 
@@ -23,8 +23,15 @@ const saveGameToDB = async (game) => {
         const db = await getDB()
         return new Promise((resolve, reject) => {
             const tx = db.transaction('games', 'readwrite')
-            const gameData = JSON.parse(JSON.stringify(game))
-            tx.objectStore('games').put(gameData)
+            const rawGame = toRaw(game)
+            const gameData = JSON.parse(JSON.stringify(rawGame))
+            
+            const store = tx.objectStore('games')
+            const req = store.put(gameData)
+            
+            req.onsuccess = () => resolve()
+            req.onerror = () => reject(req.error)
+            
             tx.oncomplete = () => resolve()
             tx.onerror = () => reject(tx.error)
         })
@@ -40,7 +47,8 @@ const saveAllGamesToDB = async (games) => {
             const tx = db.transaction('games', 'readwrite')
             const store = tx.objectStore('games')
             games.forEach(game => {
-                 const gameData = JSON.parse(JSON.stringify(game))
+                 const rawGame = toRaw(game)
+                 const gameData = JSON.parse(JSON.stringify(rawGame))
                  store.put(gameData)
             })
             tx.oncomplete = () => resolve()
@@ -402,6 +410,17 @@ const clearData = () => {
     }
 }
 
+// Exposed update method
+const updateGameStatus = async (game, status) => {
+    const targetGame = state.games.find(g => g.appid === game.appid);
+    if (targetGame) {
+        targetGame.status = status;
+        await saveGameToDB(targetGame);
+    } else {
+        console.error("Game not found in state", game.appid)
+    }
+}
+
 export function useSteam() {
     return {
         state,
@@ -414,6 +433,7 @@ export function useSteam() {
         addColumn,
         removeColumn,
         clearData,
-        getCompletionData // Exposed helper
+        getCompletionData, // Exposed helper
+        updateGameStatus // Exposed update
     }
 }
