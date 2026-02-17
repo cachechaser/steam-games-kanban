@@ -864,6 +864,10 @@ a:hover {
 .hero-section {
   margin-bottom: 60px;
   max-width: 800px;
+  
+  button {
+      margin: 20px
+      }
 }
 
 /* Reusing h1 from global context or specific if unique */
