@@ -428,7 +428,6 @@ a:hover {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--steam-bg-darker);
   color: var(--steam-text-light);
   overflow: hidden;
 }
@@ -1576,7 +1575,7 @@ a:hover {
   th {
     text-align: left;
     padding: 12px 10px;
-    color: var(--steam-text-muted);
+    color: var(--steam-text-light); 
     font-weight: 500;
     font-size: 0.85rem;
     border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -1584,7 +1583,7 @@ a:hover {
     user-select: none;
     position: sticky;
     top: 0;
-    background: var(--steam-bg-darker);
+    backdrop-filter: blur(8px) brightness(90%);
     z-index: 1;
 
     &:hover {
@@ -1594,6 +1593,11 @@ a:hover {
 
     &.text-right {
       text-align: right;
+    }
+
+    &.sorted {
+        color: #ffffff;
+        text-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
     }
   }
 
