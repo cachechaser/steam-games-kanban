@@ -217,7 +217,7 @@ const loginWithSteam = () => {
 	color: var(--steam-text-light);
 	font-weight: bold;
 	font-size: 0.9rem;
-	max-width: 100px;
+	max-width: 200px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
