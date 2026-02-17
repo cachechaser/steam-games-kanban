@@ -10,17 +10,25 @@
 	--steam-text-muted: #8f98a0;
 }
 
+html {
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* Prevent window scrolling */
+}
+
 body {
 	margin: 0;
+    padding: 0;
 	font-family: 'Roboto', 'Motiva Sans', sans-serif, Arial, Helvetica;
 	background-color: var(--steam-bg-darker); /* Very Dark Background */
 	color: var(--steam-text-light); /* Steam Light Text */
 	height: 100%;
-	width: 100vw;
+	width: 100%;
+	overflow: hidden; /* Prevent body scrolling */
 }
 
 #app {
-	height: 100vh;
+	height: 100%;
 	width: 100%;
 }
 
@@ -28,8 +36,9 @@ body {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
-	width: 100vw;
+	width: 100%;
 	background: radial-gradient(circle at top right, #1b2838 0%, #0f1219 60%);
+    overflow: hidden; /* Ensure container clips content */
 }
 
 h1 {
@@ -50,6 +59,7 @@ p {
 	display: flex;
 	flex-direction: column;
 	position: relative;
+    min-height: 0; /* Flexbox scrolling fix */
 }
 
 .content-wrapper {
@@ -58,6 +68,7 @@ p {
 	background: transparent;
 	display: flex;
 	flex-direction: column;
+    min-height: 0; /* Flexbox scrolling fix */
 }
 
 .content-wrapper > * {

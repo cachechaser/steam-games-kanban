@@ -74,13 +74,14 @@ const loginWithSteam = () => {
 	color: white;
 	height: 60px;
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-	position: sticky;
-	top: 0;
+	flex-shrink: 0;
 	z-index: 100;
 	border-bottom: 2px solid var(--steam-blue-light); /* Steam Light Blue */
 	display: flex;
 	align-items: center;
-	width: 100%; /* Force full width */
+	width: 100vw;
+	position: sticky;
+	top: 0;
 }
 
 .container {
