@@ -7,6 +7,7 @@ const {state, loadState, fetchGames, clearData, toggleGameVisibility, setGamesVi
 const newApiKey = ref('')
 const newSteamId = ref('')
 const searchTerm = ref('')
+const showHiddenOnly = ref(false)
 
 onMounted(() => {
 	loadState()
@@ -41,9 +42,15 @@ const loginWithSteam = () => {
 }
 
 const filteredGames = computed(() => {
-	if (!searchTerm.value) return state.games
-	const lower = searchTerm.value.toLowerCase()
-	return state.games.filter(g => g.name.toLowerCase().includes(lower))
+	let result = state.games
+	if (showHiddenOnly.value) {
+		result = result.filter(g => g.hidden)
+	}
+	if (searchTerm.value) {
+		const lower = searchTerm.value.toLowerCase()
+		result = result.filter(g => g.name.toLowerCase().includes(lower))
+	}
+	return result
 })
 
 const toggleHide = (game) => {
@@ -108,6 +115,9 @@ const toggleAllHidden = (hidden) => {
 			<div class="manage-controls">
 				<input v-model="searchTerm" placeholder="Search games..." class="input-field search-input"/>
 				<div class="bulk-actions">
+					<label class="filter-check" style="margin-right: 10px;">
+						<input type="checkbox" v-model="showHiddenOnly"> Show Hidden Only
+					</label>
 					<button @click="toggleAllHidden(true)" class="btn btn-secondary">Hide All</button>
 					<button @click="toggleAllHidden(false)" class="btn btn-secondary">Show All</button>
 				</div>
