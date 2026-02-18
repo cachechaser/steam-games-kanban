@@ -1,8 +1,12 @@
 <script setup>
-import {onMounted} from 'vue'
+import {onMounted, computed, ref} from 'vue'
 import {useSteam} from '../composables/useSteam'
+import GameInfoComponent from './GameInfoComponent.vue'
 
 const {state, loadState, fetchAllAchievementsDetailed, fetchAchievements, toggleGameVisibility} = useSteam()
+
+const showGameInfo = ref(false)
+const selectedGame = ref(null)
 
 const completionColumns = [
   {name: 'Backlog (0%)', min: 0, max: 0, color: '#ff5252'}, // Red
@@ -15,6 +19,11 @@ const completionColumns = [
 
 const refreshStats = async () => {
   await fetchAllAchievementsDetailed(true)
+}
+
+const openGameInfo = (game) => {
+  selectedGame.value = game
+  showGameInfo.value = true
 }
 
 onMounted(async () => {
@@ -46,39 +55,62 @@ const getCompletionData = (game) => {
   return {total: 0, achieved: 0, error: null}
 }
 
-const getGamesForColumn = (column) => {
-  return state.games.filter(g => {
-    // Hide hidden games
-    if (g.hidden) return false;
+const processedColumns = computed(() => {
+  // Create map for games
+  const gamesByCol = new Map(completionColumns.map(c => [c.name, []]))
+
+  // Single pass through games
+  state.games.forEach(g => {
+    if (g.hidden) return
 
     const stats = getCompletionData(g)
 
-    // Exclude games with explicit "No stats" error (and variations)
+    // Exclude games with explicit "No stats" error
     if (stats.error && (stats.error === 'No stats available' || stats.error.includes('No stats'))) {
-      return false;
+      return;
     }
 
-    // If no achievements loaded or total is 0, it goes to 0% column (Backlog)
-    if (!stats || stats.error || !stats.total) {
-      return column.min === 0 && column.max === 0;
+    let percentage = 0
+    if (stats && !stats.error && stats.total > 0) {
+      percentage = Math.round((stats.achieved / stats.total) * 100)
     }
 
-    const percentage = Math.round((stats.achieved / stats.total) * 100);
-    return percentage >= column.min && percentage <= column.max;
-  }).sort((a, b) => {
-    // Sort by percentage desc within column
-    const statsA = getCompletionData(a)
-    const statsB = getCompletionData(b)
-
-    const pA = statsA.total ? (statsA.achieved / statsA.total) : 0
-    const pB = statsB.total ? (statsB.achieved / statsB.total) : 0
-    return pB - pA
+    // Find column
+    const col = completionColumns.find(c => percentage >= c.min && percentage <= c.max)
+    if (col) {
+      gamesByCol.get(col.name).push(g)
+    }
   })
-}
+
+  // Sort and return structure
+  return completionColumns.map(col => {
+    const games = gamesByCol.get(col.name)
+    games.sort((a, b) => {
+      const statsA = getCompletionData(a)
+      const statsB = getCompletionData(b)
+
+      const pA = statsA.total ? (statsA.achieved / statsA.total) : 0
+      const pB = statsB.total ? (statsB.achieved / statsB.total) : 0
+      return pB - pA
+    })
+
+    return {
+      ...col,
+      games
+    }
+  })
+})
+
 </script>
 
 <template>
   <div class="completion-view">
+    <GameInfoComponent
+        :game="selectedGame"
+        :is-open="showGameInfo"
+        @close="showGameInfo = false"
+    />
+
     <div class="header-bar">
       <h1>Completion Board</h1>
       <button @click="refreshStats" :disabled="state.loading" class="btn btn-secondary reload-btn">
@@ -88,18 +120,26 @@ const getGamesForColumn = (column) => {
 
     <div class="board-container">
       <div
-          v-for="col in completionColumns"
+          v-for="col in processedColumns"
           :key="col.name"
           class="kanban-column column"
           :style="{ borderTopColor: col.color }"
       >
         <div class="column-header">
-          <h2>{{ col.name }} <span class="column-count">{{ getGamesForColumn(col).length }}</span></h2>
+          <h2>{{ col.name }} <span class="column-count">{{ col.games.length }}</span></h2>
         </div>
         <div class="card-list">
           <transition-group name="card-list">
-            <div v-for="game in getGamesForColumn(col)" :key="game.appid" class="card-panel card-hover card">
+            <div v-for="game in col.games" :key="game.appid" class="card-panel card-hover card">
               <div class="card-actions-top">
+                <button @click="openGameInfo(game)" class="hide-btn info-btn" title="More Info">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                       viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                    <path
+                        d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/>
+                  </svg>
+                </button>
                 <button @click="toggleGameVisibility(game)" class="hide-btn" title="Hide Game">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                        viewBox="0 0 16 16">
@@ -130,10 +170,10 @@ const getGamesForColumn = (column) => {
                         getCompletionData(game).total
                       }}</span>
                     <span class="percentage" :style="{ color: col.color }">
-                                    {{
+                                        {{
                         Math.round(getCompletionData(game).achieved / getCompletionData(game).total * 100)
                       }}%
-                                </span>
+                                    </span>
                   </div>
                   <div class="progress-bar">
                     <div class="progress"

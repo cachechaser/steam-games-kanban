@@ -1,6 +1,7 @@
 <script setup>
 import {ref, computed, onMounted, reactive} from 'vue'
 import {useSteam} from '../composables/useSteam'
+import GameInfoComponent from './GameInfoComponent.vue'
 
 const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed, fetchGameDetails, getCompletionData, updateGameStatus, toggleGameVisibility} = useSteam()
 
@@ -10,6 +11,10 @@ const showLayoutEditor = ref(false)
 const filterCompletion = ref(0) // Min completion %
 const hideNoAchievements = ref(false)
 const hideFree = ref(false)
+
+// Game Info Modal
+const showGameInfo = ref(false)
+const selectedGame = ref(null)
 
 // Layout Editor State
 const editingColumns = ref([])
@@ -28,7 +33,7 @@ const touchState = reactive({
 	element: null, // The clone
 	offsetX: 0,
 	offsetY: 0,
-    scrollDirection: 0
+	scrollDirection: 0
 })
 
 let scrollTimer = null;
@@ -58,13 +63,13 @@ const filteredGames = computed(() => {
 
 	if (hideNoAchievements.value) {
 		result = result.filter(g => {
-		    const stats = getCompletionData(g)
-		    return stats.total > 0
+			const stats = getCompletionData(g)
+			return stats.total > 0
 		})
 	}
 	if (filterCompletion.value > 0) {
 		result = result.filter(g => {
-		    const stats = getCompletionData(g)
+			const stats = getCompletionData(g)
 			if (!stats.total) return false
 			return (stats.achieved / stats.total * 100) >= filterCompletion.value
 		})
@@ -89,7 +94,7 @@ const onDrop = (evt, status) => {
 	const gameId = evt.dataTransfer.getData('gameId')
 	const game = state.games.find(g => g.appid.toString() === gameId)
 	if (game) {
-        updateGameStatus(game, status)
+		updateGameStatus(game, status)
 	}
 }
 
@@ -101,11 +106,11 @@ const onTouchStart = (evt, game) => {
 	touchState.initialX = evt.touches[0].clientX
 	touchState.initialY = evt.touches[0].clientY
 	touchState.game = game
-	
+
 	// Start timer for long press (reduced to 200ms for responsiveness)
 	touchState.timer = setTimeout(() => {
 		startTouchDrag(evt)
-	}, 200) 
+	}, 200)
 }
 
 const onTouchMove = (evt) => {
@@ -115,7 +120,7 @@ const onTouchMove = (evt) => {
 		if (touchState.element) {
 			touchState.element.style.left = (touch.clientX - touchState.offsetX) + 'px'
 			touchState.element.style.top = (touch.clientY - touchState.offsetY) + 'px'
-			
+
 			// Auto Scroll Logic
 			handleAutoScroll(touch.clientX);
 		}
@@ -130,50 +135,50 @@ const onTouchMove = (evt) => {
 }
 
 const handleAutoScroll = (x) => {
-    if (!boardContainerRef.value) return;
-    
-    const container = boardContainerRef.value;
-    const threshold = 80; // Larger threshold for mobile
-    const speed = 15; // Scroll speed
-    const rect = container.getBoundingClientRect();
-    
-    let direction = 0;
-    if (x < rect.left + threshold) {
-        direction = -1;
-    } else if (x > rect.right - threshold) {
-        direction = 1;
-    }
+	if (!boardContainerRef.value) return;
 
-    if (direction === 0) {
-        stopScrolling();
-        return;
-    }
+	const container = boardContainerRef.value;
+	const threshold = 80; // Larger threshold for mobile
+	const speed = 15; // Scroll speed
+	const rect = container.getBoundingClientRect();
 
-    if (touchState.scrollDirection !== direction) {
-        stopScrolling();
-        touchState.scrollDirection = direction;
-        
-        const scrollStep = () => {
-            if (touchState.scrollDirection !== 0 && boardContainerRef.value) {
-                boardContainerRef.value.scrollLeft += (speed * touchState.scrollDirection);
-            }
-        };
-        
-        scrollTimer = setInterval(scrollStep, 16);
-    }
+	let direction = 0;
+	if (x < rect.left + threshold) {
+		direction = -1;
+	} else if (x > rect.right - threshold) {
+		direction = 1;
+	}
+
+	if (direction === 0) {
+		stopScrolling();
+		return;
+	}
+
+	if (touchState.scrollDirection !== direction) {
+		stopScrolling();
+		touchState.scrollDirection = direction;
+
+		const scrollStep = () => {
+			if (touchState.scrollDirection !== 0 && boardContainerRef.value) {
+				boardContainerRef.value.scrollLeft += (speed * touchState.scrollDirection);
+			}
+		};
+
+		scrollTimer = setInterval(scrollStep, 16);
+	}
 }
 
 const onTouchEnd = (evt) => {
 	clearTimeout(touchState.timer)
-    stopScrolling();
+	stopScrolling();
 	if (touchState.active) {
 		// Find drop target
 		const touch = evt.changedTouches[0]
-		
+
 		// Hide ghost momentarily to find element underneath
 		touchState.element.style.display = 'none'
 		const target = document.elementFromPoint(touch.clientX, touch.clientY)
-		touchState.element.style.display = 'block' 
+		touchState.element.style.display = 'block'
 
 		// Traverse up to find a column with data-status
 		const col = target?.closest('.kanban-column')
@@ -183,7 +188,7 @@ const onTouchEnd = (evt) => {
 				updateGameStatus(touchState.game, status)
 			}
 		}
-		
+
 		stopTouchDrag()
 	}
 }
@@ -211,10 +216,10 @@ const startTouchDrag = (evt) => {
 	clone.style.pointerEvents = 'none' // Important to click through
 	clone.style.transform = 'scale(1.05)'
 	clone.style.boxShadow = '0 10px 20px rgba(0,0,0,0.5)'
-	
+
 	document.body.appendChild(clone)
 	touchState.element = clone
-	
+
 	// Vibrate if available
 	if (navigator.vibrate) navigator.vibrate(50)
 }
@@ -226,19 +231,24 @@ const stopTouchDrag = () => {
 		touchState.element = null
 	}
 	touchState.game = null
-    stopScrolling();
+	stopScrolling();
 }
 
 const stopScrolling = () => {
-    if (scrollTimer) {
-        clearInterval(scrollTimer);
-        scrollTimer = null;
-    }
-    touchState.scrollDirection = 0;
+	if (scrollTimer) {
+		clearInterval(scrollTimer);
+		scrollTimer = null;
+	}
+	touchState.scrollDirection = 0;
 }
 
 const toggleHide = (game) => {
 	toggleGameVisibility(game)
+}
+
+const openGameInfo = (game) => {
+	selectedGame.value = game
+	showGameInfo.value = true
 }
 
 const refreshStats = async () => {
@@ -321,6 +331,12 @@ const getColName = (col) => {
 
 <template>
 	<div class="board-view">
+		<GameInfoComponent
+				:game="selectedGame"
+				:is-open="showGameInfo"
+				@close="showGameInfo = false"
+		/>
+
 		<div class="controls-bar">
 			<h1>Your Main Board</h1>
 			<div class="search-box">
@@ -382,11 +398,11 @@ const getColName = (col) => {
 			</div>
 		</div>
 
-		<div 
-            class="board-container" 
-            ref="boardContainerRef" 
-            :class="{ 'is-dragging': touchState.active }"
-        >
+		<div
+				class="board-container"
+				ref="boardContainerRef"
+				:class="{ 'is-dragging': touchState.active }"
+		>
 			<transition-group name="column-list" tag="div" class="board-flex">
 				<div
 						v-for="(col, index) in state.columns"
@@ -418,13 +434,23 @@ const getColName = (col) => {
 									@touchend="onTouchEnd($event)"
 							>
 								<div class="card-actions-top">
+									<button @click="openGameInfo(game)" class="hide-btn info-btn" title="More Info">
+										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+											<path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+											<path
+													d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/>
+										</svg>
+									</button>
 									<button @click="toggleHide(game)" class="hide-btn" title="Hide Game">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                          <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486l.708.709z"/>
-                                          <path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829l.822.822zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/>
-                                          <path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/>
-                                        </svg>
-                                    </button>
+										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+											<path
+													d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486l.708.709z"/>
+											<path
+													d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829l.822.822zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/>
+											<path
+													d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/>
+										</svg>
+									</button>
 								</div>
 								<div class="card-header">
 									<img

@@ -1,4 +1,4 @@
-import { ref, computed, watch, reactive, toRaw } from 'vue'
+import {ref, computed, watch, reactive, toRaw} from 'vue'
 
 const STATE_KEY = 'steam_kanban_state'
 
@@ -14,7 +14,7 @@ const getDB = () => new Promise((resolve, reject) => {
     request.onupgradeneeded = (e) => {
         const db = e.target.result
         if (!db.objectStoreNames.contains('games')) {
-            db.createObjectStore('games', { keyPath: 'appid' })
+            db.createObjectStore('games', {keyPath: 'appid'})
         }
     }
 })
@@ -26,13 +26,13 @@ const saveGameToDB = async (game) => {
             const tx = db.transaction('games', 'readwrite')
             const rawGame = toRaw(game)
             const gameData = JSON.parse(JSON.stringify(rawGame))
-            
+
             const store = tx.objectStore('games')
             const req = store.put(gameData)
-            
+
             req.onsuccess = () => resolve()
             req.onerror = () => reject(req.error)
-            
+
             tx.oncomplete = () => resolve()
             tx.onerror = () => reject(tx.error)
         })
@@ -48,9 +48,9 @@ const saveAllGamesToDB = async (games) => {
             const tx = db.transaction('games', 'readwrite')
             const store = tx.objectStore('games')
             games.forEach(game => {
-                 const rawGame = toRaw(game)
-                 const gameData = JSON.parse(JSON.stringify(rawGame))
-                 store.put(gameData)
+                const rawGame = toRaw(game)
+                const gameData = JSON.parse(JSON.stringify(rawGame))
+                store.put(gameData)
             })
             tx.oncomplete = () => resolve()
             tx.onerror = () => reject(tx.error)
@@ -90,14 +90,14 @@ const clearDB = async () => {
 }
 
 const state = reactive({
-  steamId: '',
-  apiKey: '',
-  games: [],
-  columns: ['Backlog', 'Playing', 'Completed'],
-  lastUpdated: null,
-  userProfile: null,
-  loading: false,
-  error: null
+    steamId: '',
+    apiKey: '',
+    games: [],
+    columns: ['Backlog', 'Playing', 'Completed'],
+    lastUpdated: null,
+    userProfile: null,
+    loading: false,
+    error: null
 })
 
 // Error Handling Helper
@@ -116,38 +116,38 @@ const handleApiError = (response, context) => {
 
 // Persistence
 const loadState = async () => {
-  const saved = localStorage.getItem(STATE_KEY)
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved)
-      state.steamId = parsed.steamId || ''
-      state.apiKey = parsed.apiKey || ''
-      state.columns = parsed.columns || ['Backlog', 'Playing', 'Completed']
-      state.lastUpdated = parsed.lastUpdated || null
-      state.userProfile = parsed.userProfile || null
-    } catch (e) {
-      console.error('Failed to load state', e)
+    const saved = localStorage.getItem(STATE_KEY)
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved)
+            state.steamId = parsed.steamId || ''
+            state.apiKey = parsed.apiKey || ''
+            state.columns = parsed.columns || ['Backlog', 'Playing', 'Completed']
+            state.lastUpdated = parsed.lastUpdated || null
+            state.userProfile = parsed.userProfile || null
+        } catch (e) {
+            console.error('Failed to load state', e)
+        }
     }
-  }
 
-  const games = await loadGamesFromDB()
-  if (games && games.length > 0) {
-      state.games = games
-  }
+    const games = await loadGamesFromDB()
+    if (games && games.length > 0) {
+        state.games = games
+    }
 }
 
 const saveMetadata = () => {
-  try {
-    localStorage.setItem(STATE_KEY, JSON.stringify({
-      steamId: state.steamId,
-      apiKey: state.apiKey,
-      columns: state.columns,
-      lastUpdated: state.lastUpdated,
-      userProfile: state.userProfile
-    }))
-  } catch (e) {
-    console.error('Failed to save metadata', e)
-  }
+    try {
+        localStorage.setItem(STATE_KEY, JSON.stringify({
+            steamId: state.steamId,
+            apiKey: state.apiKey,
+            columns: state.columns,
+            lastUpdated: state.lastUpdated,
+            userProfile: state.userProfile
+        }))
+    } catch (e) {
+        console.error('Failed to save metadata', e)
+    }
 }
 
 watch(() => [state.steamId, state.apiKey, state.columns, state.lastUpdated, state.userProfile], saveMetadata)
@@ -159,7 +159,7 @@ const getCompletionData = (game) => {
     if (game.achievementsList && game.achievementsList.achievements) {
         const total = game.achievementsList.achievements.length
         const achieved = game.achievementsList.achievements.filter(a => a.achieved).length
-        return { total, achieved, error: null }
+        return {total, achieved, error: null}
     }
     // Fallback to simple stats if they exist (legacy)
     if (game.achievements) {
@@ -167,10 +167,10 @@ const getCompletionData = (game) => {
     }
     // Fallback error from list
     if (game.achievementsList && game.achievementsList.error) {
-        return { total: 0, achieved: 0, error: game.achievementsList.error }
+        return {total: 0, achieved: 0, error: game.achievementsList.error}
     }
 
-    return { total: 0, achieved: 0, error: null }
+    return {total: 0, achieved: 0, error: null}
 }
 
 // Logic
@@ -183,7 +183,7 @@ const fetchUserProfile = async () => {
             console.warn(handleApiError(response, 'User Profile'))
             return
         }
-        
+
         const data = await response.json()
         if (data.response && data.response.players && data.response.players.length > 0) {
             state.userProfile = data.response.players[0]
@@ -196,185 +196,185 @@ const fetchUserProfile = async () => {
 
 // Smart Game Fetching
 const fetchGames = async () => {
-  if (state.loading) return
-  
-  if (!state.steamId || !state.apiKey) {
-    state.error = 'Please set your Steam ID and API Key in Profile settings.'
-    return
-  }
-  
-  state.loading = true
-  state.error = null
-  
-  fetchUserProfile()
+    if (state.loading) return
 
-  try {
-    const response = await fetch(`/api/steam/IPlayerService/GetOwnedGames/v0001/?key=${state.apiKey}&steamid=${state.steamId}&format=json&include_appinfo=1&include_played_free_games=1`)
-    
-    if (!response.ok) {
-        state.error = handleApiError(response, 'Game List')
+    if (!state.steamId || !state.apiKey) {
+        state.error = 'Please set your Steam ID and API Key in Profile settings.'
         return
     }
-    
-    const data = await response.json()
-    if (data.response && data.response.games) {
-      const existingMap = new Map(state.games.map(g => [g.appid, g]))
-      let hasUpdates = false
 
-      const newGames = data.response.games.map(g => {
-        const existing = existingMap.get(g.appid)
+    state.loading = true
+    state.error = null
 
-        // Determine if we need to update achievements
-        let needsUpdate = false
+    fetchUserProfile()
 
-        if (!existing) {
-            // New game detected
-            needsUpdate = true
+    try {
+        const response = await fetch(`/api/steam/IPlayerService/GetOwnedGames/v0001/?key=${state.apiKey}&steamid=${state.steamId}&format=json&include_appinfo=1&include_played_free_games=1`)
+
+        if (!response.ok) {
+            state.error = handleApiError(response, 'Game List')
+            return
+        }
+
+        const data = await response.json()
+        if (data.response && data.response.games) {
+            const existingMap = new Map(state.games.map(g => [g.appid, g]))
+            let hasUpdates = false
+
+            const newGames = data.response.games.map(g => {
+                const existing = existingMap.get(g.appid)
+
+                // Determine if we need to update achievements
+                let needsUpdate = false
+
+                if (!existing) {
+                    // New game detected
+                    needsUpdate = true
+                } else {
+                    // Existing game, check if playtime/last_played changed
+                    // rtime_last_played is unix timestamp
+                    if (g.rtime_last_played !== existing.rtime_last_played) {
+                        needsUpdate = true
+                    }
+                    // Or if we don't have achievements loaded yet
+                    if (!existing.achievementsList || existing.achievementsList.error) {
+                        needsUpdate = true
+                    }
+                }
+
+                if (needsUpdate) hasUpdates = true
+
+                return {
+                    ...g,
+                    status: existing ? existing.status : 'Backlog',
+                    achievements: existing ? existing.achievements : null,
+                    achievementsList: existing ? existing.achievementsList : null,
+                    hidden: existing ? existing.hidden : false,
+                    loadingStats: false,
+                    loadingDetails: false,
+                    needsUpdate: needsUpdate // Flag for detailed fetcher
+                }
+            })
+
+            state.games = newGames
+
+            await saveAllGamesToDB(state.games)
+
+            await fetchAllAchievementsDetailed(true)
+
         } else {
-            // Existing game, check if playtime/last_played changed
-            // rtime_last_played is unix timestamp
-            if (g.rtime_last_played !== existing.rtime_last_played) {
-                needsUpdate = true
-            }
-            // Or if we don't have achievements loaded yet
-            if (!existing.achievementsList || existing.achievementsList.error) {
-                needsUpdate = true
-            }
+            state.games = []
+            clearDB()
         }
-
-        if (needsUpdate) hasUpdates = true
-
-        return {
-          ...g,
-          status: existing ? existing.status : 'Backlog',
-          achievements: existing ? existing.achievements : null,
-          achievementsList: existing ? existing.achievementsList : null,
-          hidden: existing ? existing.hidden : false,
-          loadingStats: false,
-          loadingDetails: false,
-          needsUpdate: needsUpdate // Flag for detailed fetcher
-        }
-      })
-
-      state.games = newGames
-
-      await saveAllGamesToDB(state.games)
-
-      await fetchAllAchievementsDetailed(true)
-
-    } else {
-      state.games = []
-      clearDB()
+    } catch (err) {
+        state.error = "Network Error: Failed to connect to Steam API."
+        console.error(err)
+    } finally {
+        state.loading = false
     }
-  } catch (err) {
-    state.error = "Network Error: Failed to connect to Steam API."
-    console.error(err)
-  } finally {
-    state.loading = false
-  }
 }
 
 const fetchGameDetails = async (game) => {
-  if (game.loadingDetails) return
+    if (game.loadingDetails) return
 
-  // If not needing update and we have data, skip
-  // EXCEPT if this is called manually (e.g. user clicked "Load Stats"), we might want to force it?
-  // We can assume manual calls imply desire to fetch.
-  // But let's check if we already have valid data to avoid spam.
-  if (!game.needsUpdate && game.achievementsList && !game.achievementsList.error && game.achievementsList.achievements) {
-      return
-  }
+    // If not needing update and we have data, skip
+    // EXCEPT if this is called manually (e.g. user clicked "Load Stats"), we might want to force it?
+    // We can assume manual calls imply desire to fetch.
+    // But let's check if we already have valid data to avoid spam.
+    if (!game.needsUpdate && game.achievementsList && !game.achievementsList.error && game.achievementsList.achievements) {
+        return
+    }
 
-  game.loadingDetails = true
+    game.loadingDetails = true
 
-  try {
-      const p1 = fetch(`/api/steam/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${game.appid}&key=${state.apiKey}&steamid=${state.steamId}&l=english`)
-      const p2 = fetch(`/api/steam/ISteamUserStats/GetSchemaForGame/v2/?key=${state.apiKey}&appid=${game.appid}&l=english`)
-      const p3 = fetch(`/api/steam/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${game.appid}&format=json`)
+    try {
+        const p1 = fetch(`/api/steam/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${game.appid}&key=${state.apiKey}&steamid=${state.steamId}&l=english`)
+        const p2 = fetch(`/api/steam/ISteamUserStats/GetSchemaForGame/v2/?key=${state.apiKey}&appid=${game.appid}&l=english`)
+        const p3 = fetch(`/api/steam/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${game.appid}&format=json`)
 
-      const [r1, r2, r3] = await Promise.all([p1, p2, p3])
+        const [r1, r2, r3] = await Promise.all([p1, p2, p3])
 
-      // Check for rate limits or errors in batch
-      if (r1.status === 429 || r2.status === 429 || r3.status === 429) {
-          throw new Error("Rate Limit Exceeded")
-      }
+        // Check for rate limits or errors in batch
+        if (r1.status === 429 || r2.status === 429 || r3.status === 429) {
+            throw new Error("Rate Limit Exceeded")
+        }
 
-      const playerData = r1.ok ? await r1.json() : null
-      const schemaData = r2.ok ? await r2.json() : null
-      const globalData = r3.ok ? await r3.json() : null
+        const playerData = r1.ok ? await r1.json() : null
+        const schemaData = r2.ok ? await r2.json() : null
+        const globalData = r3.ok ? await r3.json() : null
 
-      if (!playerData || !playerData.playerstats || !playerData.playerstats.achievements) {
-           game.achievementsList = { error: 'No player stats' }
-           game.needsUpdate = false
-           await saveGameToDB(game)
-           return
-      }
+        if (!playerData || !playerData.playerstats || !playerData.playerstats.achievements) {
+            game.achievementsList = {error: 'No player stats'}
+            game.needsUpdate = false
+            await saveGameToDB(game)
+            return
+        }
 
-      const playerAchievements = playerData.playerstats.achievements
-      const schemaAchievements = schemaData?.game?.availableGameStats?.achievements || []
-      const globalAchievements = globalData?.achievementpercentages?.achievements || []
+        const playerAchievements = playerData.playerstats.achievements
+        const schemaAchievements = schemaData?.game?.availableGameStats?.achievements || []
+        const globalAchievements = globalData?.achievementpercentages?.achievements || []
 
-      const schemaMap = new Map(schemaAchievements.map(a => [a.name, a]))
-      const globalMap = new Map(globalAchievements.map(a => [a.name, a.percent]))
+        const schemaMap = new Map(schemaAchievements.map(a => [a.name, a]))
+        const globalMap = new Map(globalAchievements.map(a => [a.name, a.percent]))
 
-      const combined = playerAchievements.map(pa => {
-          const schema = schemaMap.get(pa.apiname)
-          const globalPercent = globalMap.get(pa.apiname)
+        const combined = playerAchievements.map(pa => {
+            const schema = schemaMap.get(pa.apiname)
+            const globalPercent = globalMap.get(pa.apiname)
 
-          return {
-              apiname: pa.apiname,
-              name: schema?.displayName || pa.name || pa.apiname,
-              description: schema?.description || pa.description || '',
-              achieved: pa.achieved,
-              unlocktime: pa.unlocktime,
-              icon: schema?.icon || '',
-              icongray: schema?.icongray || '',
-              unlockPercentage: Number(globalPercent) || 0
-          }
-      })
+            return {
+                apiname: pa.apiname,
+                name: schema?.displayName || pa.name || pa.apiname,
+                description: schema?.description || pa.description || '',
+                achieved: pa.achieved,
+                unlocktime: pa.unlocktime,
+                icon: schema?.icon || '',
+                icongray: schema?.icongray || '',
+                unlockPercentage: Number(globalPercent) || 0
+            }
+        })
 
-      game.achievementsList = { achievements: combined }
-      game.needsUpdate = false // Clear flag
+        game.achievementsList = {achievements: combined}
+        game.needsUpdate = false // Clear flag
 
-      await saveGameToDB(game)
+        await saveGameToDB(game)
 
-  } catch (e) {
-      if (e.message.includes("Rate Limit")) {
-          state.error = "Rate limit reached. Some games were not updated."
-      }
-      console.error(`Error fetching details for ${game.name}: ${e.message}`)
-      game.achievementsList = { error: e.message }
-  } finally {
-      game.loadingDetails = false
-  }
+    } catch (e) {
+        if (e.message.includes("Rate Limit")) {
+            state.error = "Rate limit reached. Some games were not updated."
+        }
+        console.error(`Error fetching details for ${game.name}: ${e.message}`)
+        game.achievementsList = {error: e.message}
+    } finally {
+        game.loadingDetails = false
+    }
 }
 
 const fetchAllAchievementsDetailed = async (onlyDirty = false) => {
-  if (!state.games.length) return
+    if (!state.games.length) return
 
-  let targets = state.games.filter(g => !g.hidden)
+    let targets = state.games.filter(g => !g.hidden)
 
-  if (onlyDirty) {
-      targets = targets.filter(g => g.needsUpdate)
-      if (targets.length === 0) {
-          console.log("No games need achievement updates.")
-          return
-      }
-      console.log(`Updating achievements for ${targets.length} games...`)
-  }
+    if (onlyDirty) {
+        targets = targets.filter(g => g.needsUpdate)
+        if (targets.length === 0) {
+            console.log("No games need achievement updates.")
+            return
+        }
+        console.log(`Updating achievements for ${targets.length} games...`)
+    }
 
-  const BATCH_SIZE = 3
-  for (let i = 0; i < targets.length; i += BATCH_SIZE) {
-      // Stop if error is critical
-      if (state.error && state.error.includes("Rate Limit")) break
+    const BATCH_SIZE = 3
+    for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+        // Stop if error is critical
+        if (state.error && state.error.includes("Rate Limit")) break
 
-      const batch = targets.slice(i, i + BATCH_SIZE)
-      await Promise.all(batch.map(g => fetchGameDetails(g)))
-      await new Promise(r => setTimeout(r, 100)) // Throttle slightly
-  }
+        const batch = targets.slice(i, i + BATCH_SIZE)
+        await Promise.all(batch.map(g => fetchGameDetails(g)))
+        await new Promise(r => setTimeout(r, 100)) // Throttle slightly
+    }
 
-  state.lastUpdated = Date.now()
-  saveMetadata()
+    state.lastUpdated = Date.now()
+    saveMetadata()
 }
 
 // Wrapper for manual refresh
@@ -403,7 +403,7 @@ const removeColumn = (name) => {
 }
 
 const clearData = () => {
-    if(confirm("Clear all local data?")) {
+    if (confirm("Clear all local data?")) {
         localStorage.removeItem(STATE_KEY)
         clearDB().then(() => {
             window.location.reload()
