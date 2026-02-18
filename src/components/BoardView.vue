@@ -2,7 +2,7 @@
 import {ref, computed, onMounted, reactive} from 'vue'
 import {useSteam} from '../composables/useSteam'
 
-const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed, fetchGameDetails, getCompletionData, updateGameStatus} = useSteam()
+const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed, fetchGameDetails, getCompletionData, updateGameStatus, toggleGameVisibility} = useSteam()
 
 const searchTerm = ref('')
 const showFilters = ref(false)
@@ -238,7 +238,7 @@ const stopScrolling = () => {
 }
 
 const toggleHide = (game) => {
-	game.hidden = !game.hidden
+	toggleGameVisibility(game)
 }
 
 const refreshStats = async () => {
@@ -429,7 +429,7 @@ const getColName = (col) => {
 								<div class="card-header">
 									<img
 											v-if="game.img_icon_url"
-											:src="`http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
+											:src="`//media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
 											alt="icon"
 											class="game-icon"
 									/>

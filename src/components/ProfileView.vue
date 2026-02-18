@@ -312,7 +312,7 @@ const goToEdit = () => {
 				<div class="simple-list">
 					<div v-for="game in stats.recent" :key="game.appid" class="list-row">
 						<img
-								:src="`http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
+								:src="`//media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
 								class="icon"/>
 						<span class="name">{{ game.name }}</span>
 						<span class="val">{{ Math.round(game.playtime_2weeks / 60) }}h</span>

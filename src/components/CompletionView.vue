@@ -101,7 +101,7 @@ const getGamesForColumn = (column) => {
 						<div class="card-header">
 							<img
 									v-if="game.img_icon_url"
-									:src="`http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
+									:src="`//media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
 									alt="icon"
 									class="game-icon"
 							/>

@@ -2,7 +2,7 @@
 import {ref, computed, onMounted} from 'vue'
 import {useSteam} from '../composables/useSteam'
 
-const {state, loadState, fetchGames, clearData} = useSteam()
+const {state, loadState, fetchGames, clearData, toggleGameVisibility, setGamesVisibility} = useSteam()
 
 const newApiKey = ref('')
 const newSteamId = ref('')
@@ -47,12 +47,12 @@ const filteredGames = computed(() => {
 })
 
 const toggleHide = (game) => {
-	game.hidden = !game.hidden
+	toggleGameVisibility(game)
 }
 
 const toggleAllHidden = (hidden) => {
 	if (confirm(`Set ALL filtered games to ${hidden ? 'Hidden' : 'Visible'}?`)) {
-		filteredGames.value.forEach(g => g.hidden = hidden)
+		setGamesVisibility(filteredGames.value, hidden)
 	}
 }
 
@@ -118,7 +118,7 @@ const toggleAllHidden = (hidden) => {
 					<div v-for="game in filteredGames" :key="game.appid" class="game-item" :class="{ hidden: game.hidden }">
 						<img
 								v-if="game.img_icon_url"
-								:src="`http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
+								:src="`//media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
 								alt=""
 						/>
 						<span class="name">{{ game.name }}</span>

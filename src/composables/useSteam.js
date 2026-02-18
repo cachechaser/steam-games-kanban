@@ -4,6 +4,7 @@ const STATE_KEY = 'steam_kanban_state'
 
 // IndexedDB Helper
 const DB_NAME = 'SteamKanbanDB'
+// TODO: If we need to change the structure later, we can increment this version and handle migrations in onupgradeneeded
 const DB_VERSION = 2
 
 const getDB = () => new Promise((resolve, reject) => {
@@ -421,6 +422,30 @@ const updateGameStatus = async (game, status) => {
     }
 }
 
+const toggleGameVisibility = async (game) => {
+    const targetGame = state.games.find(g => g.appid === game.appid);
+    if (targetGame) {
+        targetGame.hidden = !targetGame.hidden;
+        await saveGameToDB(targetGame);
+    }
+}
+
+const setGameVisibility = async (game, isHidden) => {
+    const targetGame = state.games.find(g => g.appid === game.appid);
+    if (targetGame) {
+        targetGame.hidden = isHidden;
+        await saveGameToDB(targetGame);
+    }
+}
+
+const setGamesVisibility = async (games, isHidden) => {
+    games.forEach(g => {
+        const target = state.games.find(tg => tg.appid === g.appid)
+        if (target) target.hidden = isHidden
+    })
+    await saveAllGamesToDB(state.games)
+}
+
 export function useSteam() {
     return {
         state,
@@ -434,6 +459,9 @@ export function useSteam() {
         removeColumn,
         clearData,
         getCompletionData, // Exposed helper
-        updateGameStatus // Exposed update
+        updateGameStatus, // Exposed update
+        toggleGameVisibility,
+        setGameVisibility,
+        setGamesVisibility
     }
 }
