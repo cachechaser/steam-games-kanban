@@ -1,4 +1,6 @@
 <script setup>
+import InfoIcon from './icons/InfoIcon.vue'
+
 const props = defineProps({
 	achievements: {
 		type: Array,
@@ -73,6 +75,9 @@ const getIconUrl = (ach) => {
 				<td v-if="showGameColumn" class="game-cell">
 					<div class="game-info" @click="onGameClick(ach)" style="cursor: pointer;">
 						<span class="game-name">{{ ach.gameName }}</span>
+						<span class="game-info-icon" title="Game Info">
+							<InfoIcon/>
+						</span>
 					</div>
 				</td>
 				<td class="desc-cell">
@@ -158,6 +163,46 @@ const getIconUrl = (ach) => {
 .game-cell {
 	width: 20%;
 	max-width: 200px;
+}
+
+.game-info {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.game-info-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: var(--steam-bg-darker);
+	color: var(--steam-text-muted);
+	opacity: 0;
+	transition: opacity 0.15s ease;
+	flex-shrink: 0;
+}
+
+.game-info-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.game-info-icon:hover {
+	background: rgba(255, 255, 255, 0.15);
+	color: #ccc;
+}
+
+.ach-table tr:hover .game-info-icon {
+	opacity: 1;
+}
+
+@media (hover: none) {
+	.ach-table tr:hover .game-info-icon {
+		opacity: 0;
+	}
 }
 
 .ach-content-wrapper {

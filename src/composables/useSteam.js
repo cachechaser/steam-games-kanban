@@ -194,92 +194,13 @@ const fetchUserProfile = async () => {
     }
 }
 
-// Smart Game Fetching
-const fetchGames = async () => {
-    if (state.loading) return
-
-    if (!state.steamId || !state.apiKey) {
-        state.error = 'Please set your Steam ID and API Key in Profile settings.'
-        return
-    }
-
-    state.loading = true
-    state.error = null
-
-    fetchUserProfile()
-
-    try {
-        const response = await fetch(`/api/steam/IPlayerService/GetOwnedGames/v0001/?key=${state.apiKey}&steamid=${state.steamId}&format=json&include_appinfo=1&include_played_free_games=1`)
-
-        if (!response.ok) {
-            state.error = handleApiError(response, 'Game List')
-            return
-        }
-
-        const data = await response.json()
-        if (data.response && data.response.games) {
-            const existingMap = new Map(state.games.map(g => [g.appid, g]))
-            let hasUpdates = false
-
-            state.games = data.response.games.map(g => {
-                const existing = existingMap.get(g.appid)
-
-                // Determine if we need to update achievements
-                let needsUpdate = false
-
-                if (!existing) {
-                    // New game detected
-                    needsUpdate = true
-                } else {
-                    // Existing game, check if playtime/last_played changed
-                    // rtime_last_played is unix timestamp
-                    if (g.rtime_last_played !== existing.rtime_last_played) {
-                        needsUpdate = true
-                    }
-                    // Or if we don't have achievements loaded yet
-                    if (!existing.achievementsList || existing.achievementsList.error) {
-                        needsUpdate = true
-                    }
-                }
-
-                if (needsUpdate) hasUpdates = true
-
-                return {
-                    ...g,
-                    status: existing ? existing.status : 'Backlog',
-                    achievements: existing ? existing.achievements : null,
-                    achievementsList: existing ? existing.achievementsList : null,
-                    hidden: existing ? existing.hidden : false,
-                    loadingStats: false,
-                    loadingDetails: false,
-                    needsUpdate: needsUpdate // Flag for detailed fetcher
-                }
-            })
-
-            await saveAllGamesToDB(state.games)
-
-            await fetchAllAchievementsDetailed(true)
-
-        } else {
-            state.games = []
-            clearDB()
-        }
-    } catch (err) {
-        state.error = "Network Error: Failed to connect to Steam API."
-        console.error(err)
-    } finally {
-        state.loading = false
-    }
-}
-
-const fetchGameDetails = async (game) => {
+// Fetch detailed achievement data for a single game.
+// Used internally by refreshLibrary and exposed for manual single-game "Load Stats" button.
+const fetchGameDetails = async (game, force = false) => {
     if (game.loadingDetails) return
 
-    // If not needing update and we have data, skip
-    // EXCEPT if this is called manually (e.g. user clicked "Load Stats"), we might want to force it?
-    // We can assume manual calls imply desire to fetch.
-    // But let's check if we already have valid data to avoid spam.
-    if (!game.needsUpdate && game.achievementsList && !game.achievementsList.error && game.achievementsList.achievements) {
+    // Skip if we already have valid data and no update is needed (unless forced)
+    if (!force && !game.needsUpdate && game.achievementsList && !game.achievementsList.error && game.achievementsList.achievements) {
         return
     }
 
@@ -292,7 +213,6 @@ const fetchGameDetails = async (game) => {
 
         const [r1, r2, r3] = await Promise.all([p1, p2, p3])
 
-        // Check for rate limits or errors in batch
         if (r1.status === 429 || r2.status === 429 || r3.status === 429) {
             throw new Error("Rate Limit Exceeded")
         }
@@ -332,7 +252,7 @@ const fetchGameDetails = async (game) => {
         })
 
         game.achievementsList = {achievements: combined}
-        game.needsUpdate = false // Clear flag
+        game.needsUpdate = false
 
         await saveGameToDB(game)
 
@@ -347,37 +267,111 @@ const fetchGameDetails = async (game) => {
     }
 }
 
-const fetchAllAchievementsDetailed = async (onlyDirty = false) => {
-    if (!state.games.length) return
+/**
+ * Single entry point for refreshing the library.
+ * 1. Fetches the full game list from Steam
+ * 2. Determines which games need achievement updates:
+ *    - New games (not seen before)
+ *    - Games played since last refresh (rtime_last_played changed OR after lastUpdated)
+ *    - Games with missing or errored achievement data
+ * 3. Fetches detailed achievements only for those games
+ * 4. Updates lastUpdated timestamp
+ */
+const refreshLibrary = async () => {
+    if (state.loading) return
 
-    let targets = state.games.filter(g => !g.hidden)
+    if (!state.steamId || !state.apiKey) {
+        state.error = 'Please set your Steam ID and API Key in Profile settings.'
+        return
+    }
 
-    if (onlyDirty) {
-        targets = targets.filter(g => g.needsUpdate)
-        if (targets.length === 0) {
-            console.log("No games need achievement updates.")
+    state.loading = true
+    state.error = null
+
+    await fetchUserProfile()
+
+    try {
+        const response = await fetch(`/api/steam/IPlayerService/GetOwnedGames/v0001/?key=${state.apiKey}&steamid=${state.steamId}&format=json&include_appinfo=1&include_played_free_games=1`)
+
+        if (!response.ok) {
+            state.error = handleApiError(response, 'Game List')
             return
         }
-        console.log(`Updating achievements for ${targets.length} games...`)
+
+        const data = await response.json()
+        if (!data.response || !data.response.games) {
+            state.games = []
+            await clearDB()
+            return
+        }
+
+        const existingMap = new Map(state.games.map(g => [g.appid, g]))
+        const lastRefresh = state.lastUpdated || 0
+        // Convert ms to seconds for comparison with Steam's unix timestamps
+        const lastRefreshUnix = Math.floor(lastRefresh / 1000)
+
+        state.games = data.response.games.map(g => {
+            const existing = existingMap.get(g.appid)
+
+            let needsUpdate = false
+
+            if (!existing) {
+                needsUpdate = true
+            } else {
+                // game was played since last refresh
+                const playedSinceRefresh =
+                    g.rtime_last_played !== existing.rtime_last_played ||
+                    (g.rtime_last_played && g.rtime_last_played > lastRefreshUnix)
+
+                if (playedSinceRefresh) {
+                    needsUpdate = true
+                } else if (!existing.achievementsList) {
+                    needsUpdate = false
+                }
+                // If it was attempted before but errored/has no stats, and hasn't been played — don't retry
+            }
+
+            return {
+                ...g,
+                status: existing ? existing.status : 'Backlog',
+                achievements: existing ? existing.achievements : null,
+                achievementsList: existing ? existing.achievementsList : null,
+                hidden: existing ? existing.hidden : false,
+                loadingStats: false,
+                loadingDetails: false,
+                needsUpdate
+            }
+        })
+
+        await saveAllGamesToDB(state.games)
+
+        // Fetch achievements only for games that need it
+        const targets = state.games.filter(g => g.needsUpdate && !g.hidden)
+
+        if (targets.length > 0) {
+            console.log(`Updating achievements for ${targets.length} game(s)...`)
+
+            const BATCH_SIZE = 3
+            for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+                if (state.error && state.error.includes("Rate Limit")) break
+
+                const batch = targets.slice(i, i + BATCH_SIZE)
+                await Promise.all(batch.map(g => fetchGameDetails(g)))
+                await new Promise(r => setTimeout(r, 100))
+            }
+        } else {
+            console.log("All games are up to date, no achievement fetches needed.")
+        }
+
+        state.lastUpdated = Date.now()
+        saveMetadata()
+
+    } catch (err) {
+        state.error = "Network Error: Failed to connect to Steam API."
+        console.error(err)
+    } finally {
+        state.loading = false
     }
-
-    const BATCH_SIZE = 3
-    for (let i = 0; i < targets.length; i += BATCH_SIZE) {
-        // Stop if error is critical
-        if (state.error && state.error.includes("Rate Limit")) break
-
-        const batch = targets.slice(i, i + BATCH_SIZE)
-        await Promise.all(batch.map(g => fetchGameDetails(g)))
-        await new Promise(r => setTimeout(r, 100)) // Throttle slightly
-    }
-
-    state.lastUpdated = Date.now()
-    saveMetadata()
-}
-
-// Wrapper for manual refresh
-const refreshLibrary = async () => {
-    await fetchGames()
 }
 
 const addColumn = (name) => {
@@ -449,15 +443,13 @@ export function useSteam() {
         state,
         loadState,
         refreshLibrary,
-        fetchGames,
-        fetchAllAchievementsDetailed,
-        fetchGameDetails, // Exposed for manual single-game fetch
+        fetchGameDetails, // For manual single-game "Load Stats" button
         fetchUserProfile,
         addColumn,
         removeColumn,
         clearData,
-        getCompletionData, // Exposed helper
-        updateGameStatus, // Exposed update
+        getCompletionData,
+        updateGameStatus,
         toggleGameVisibility,
         setGameVisibility,
         setGamesVisibility

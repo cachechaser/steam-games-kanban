@@ -1,8 +1,13 @@
 <script setup>
 import {ref, computed, onMounted} from 'vue'
 import {useSteam} from '@/composables/useSteam.js'
+import {useSteamLogin} from '@/composables/useSteamLogin.js'
+import GameIconImg from '../ui/GameIconImg.vue'
 
-const {state, loadState, fetchGames, clearData, toggleGameVisibility, setGamesVisibility} = useSteam()
+const {state, loadState, refreshLibrary, clearData, toggleGameVisibility, setGamesVisibility} = useSteam()
+const {loginWithSteam: loginWithSteamRaw} = useSteamLogin()
+
+const loginWithSteam = () => loginWithSteamRaw('#/profile/edit')
 
 const newApiKey = ref('')
 const newSteamId = ref('')
@@ -21,25 +26,10 @@ const saveSettings = async () => {
 	// Trigger save via watcher in composable
 	// Also try to fetch games if changed
 	if (state.apiKey && state.steamId) {
-		await fetchGames()
+		await refreshLibrary()
 	}
 }
 
-const loginWithSteam = () => {
-	const returnUrl = window.location.href.split('#')[0] + '#/profile/edit';
-	const realm = window.location.origin;
-
-	const params = new URLSearchParams({
-		'openid.ns': 'http://specs.openid.net/auth/2.0',
-		'openid.mode': 'checkid_setup',
-		'openid.return_to': returnUrl,
-		'openid.realm': realm,
-		'openid.identity': 'http://specs.openid.net/auth/2.0/identifier_select',
-		'openid.claimed_id': 'http://specs.openid.net/auth/2.0/identifier_select'
-	});
-
-	window.location.href = `https://steamcommunity.com/openid/login?${params.toString()}`;
-}
 
 const filteredGames = computed(() => {
 	let result = state.games
@@ -126,10 +116,9 @@ const toggleAllHidden = (hidden) => {
 			<div class="games-list">
 				<transition-group name="list">
 					<div v-for="game in filteredGames" :key="game.appid" class="game-item" :class="{ hidden: game.hidden }">
-						<img
-								v-if="game.img_icon_url"
-								:src="`//media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
-								alt=""
+						<GameIconImg
+								:appid="game.appid"
+								:icon-hash="game.img_icon_url"
 						/>
 						<span class="name">{{ game.name }}</span>
 						<div class="game-actions">

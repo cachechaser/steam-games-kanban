@@ -1,19 +1,17 @@
 <script setup>
 import {ref, computed, onMounted} from 'vue'
-import {useSteam} from '@/composables/useSteam.js'
 import GameInfoComponent from '../GameInfoComponent.vue'
 import AchievementTable from '../AchievementTable.vue'
+import ViewHeader from "@/components/ui/ViewHeader.vue";
+import {useGameInfoModal} from "@/composables/useGameInfoModal.js";
+import {useStatsAutoLoad} from "@/composables/useStatsAutoLoad.js";
 
-const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed} = useSteam()
+const {showGameInfo, selectedGame, openGameInfo, closeGameInfo} = useGameInfoModal()
+const {state, refreshLibrary} = useStatsAutoLoad()
 
 // Data
-const loading = ref(false)
 const currentPage = ref(1)
 const achievementsPerPage = 50 // Reduced for list view
-
-// Game Info Modal
-const showGameInfo = ref(false)
-const selectedGame = ref(null)
 
 // Filters
 const filterLocked = ref('all') // 'all', 'locked', 'unlocked'
@@ -132,17 +130,6 @@ const handleSort = (field) => {
 	}
 }
 
-const loadAchievements = async () => {
-	// Uses the new smart refresh
-	loading.value = true
-	try {
-		await refreshLibrary()
-		if (currentPage.value === 1) currentPage.value = 1
-	} finally {
-		loading.value = false
-	}
-}
-
 const goToPage = (page) => {
 	if (page >= 1 && page <= totalPages.value) {
 		currentPage.value = page
@@ -166,28 +153,12 @@ const clearFilters = () => {
 	currentPage.value = 1
 }
 
-const openGameInfo = (ach) => {
+const openGameInfoFromAch = (ach) => {
 	const game = state.games.find(g => g.appid === ach.appid)
 	if (game) {
-		selectedGame.value = game
-		showGameInfo.value = true
+		openGameInfo(game)
 	}
 }
-
-onMounted(async () => {
-	await loadState()
-	const now = Date.now()
-	const lastUpdate = state.lastUpdated || 0
-	const hasAchievements = state.games.some(g => g.achievementsList && g.achievementsList.achievements && g.achievementsList.achievements.length > 0)
-
-	if (!hasAchievements || (now - lastUpdate > 172800000)) {
-		if (!hasAchievements) {
-			loadAchievements()
-		} else {
-			fetchAllAchievementsDetailed()
-		}
-	}
-})
 </script>
 
 <template>
@@ -195,24 +166,25 @@ onMounted(async () => {
 		<GameInfoComponent
 				:game="selectedGame"
 				:is-open="showGameInfo"
-				@close="showGameInfo = false"
+				@close="closeGameInfo"
 		/>
 
 		<!-- Header -->
-		<div class="header-bar">
-			<div class="header-title">
-				<h1>Achievements</h1>
+		<ViewHeader title="Achievements">
+			<template #after-title>
 				<span class="results-count">{{ pageInfo.total }} Total</span>
-			</div>
-			<span v-if="loading" class="loading-text">Checking for updates...</span>
-			<button
-					@click="loadAchievements"
-					:disabled="loading"
-					class="btn btn-secondary reload-btn"
-			>
-				↻ Refresh Library
-			</button>
-		</div>
+			</template>
+			<template #actions>
+				<span v-if="state.loading" class="loading-text">Checking for updates...</span>
+				<button
+						@click="refreshLibrary"
+						:disabled="state.loading"
+						class="btn btn-secondary reload-btn"
+				>
+					↻ Refresh Library
+				</button>
+			</template>
+		</ViewHeader>
 
 		<!-- Error Banner -->
 		<div v-if="state.error" class="error-banner">
@@ -262,12 +234,12 @@ onMounted(async () => {
 		<!-- Table List -->
 		<AchievementTable
 				:achievements="paginatedAchievements"
-				:loading="loading"
+				:loading="state.loading"
 				:sort-by="sortBy"
 				:sort-desc="sortDesc"
 				:show-game-column="true"
 				@sort="handleSort"
-				@game-click="openGameInfo"
+				@game-click="openGameInfoFromAch"
 		/>
 
 		<!-- Pagination -->

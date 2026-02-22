@@ -2,6 +2,7 @@
 import {computed} from 'vue'
 import {useSteam} from '../composables/useSteam'
 import AchievementTable from './AchievementTable.vue'
+import GameIconImg from './ui/GameIconImg.vue'
 
 const props = defineProps({
 	game: Object,
@@ -61,11 +62,11 @@ const close = () => {
 
 				<!-- Header -->
 				<div class="modal-header-custom">
-					<img
-							v-if="game.img_icon_url"
-							:src="`//media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
+					<GameIconImg
+							:appid="game.appid"
+							:icon-hash="game.img_icon_url"
+							size="large"
 							class="game-icon-large"
-							alt=""
 					/>
 					<div class="header-text">
 						<h2>{{ game.name }}</h2>

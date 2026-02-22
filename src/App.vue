@@ -12,7 +12,7 @@ import AchievementView from './components/views/AchievementView.vue'
 import HomeView from './components/views/HomeView.vue'
 
 const {currentView, navigate} = useRouter()
-const {state, loadState, fetchGames} = useSteam()
+const {state, loadState, refreshLibrary} = useSteam()
 const isInitialized = ref(false)
 
 const currentComponent = computed(() => {
@@ -59,7 +59,7 @@ const checkOpenIdReturn = async () => {
 			navigate('#/profile/edit');
 			window.history.replaceState({}, document.title, window.location.pathname + '#/profile/edit');
 			if (state.apiKey) {
-				await fetchGames();
+				await refreshLibrary();
 			}
 			return true;
 		}

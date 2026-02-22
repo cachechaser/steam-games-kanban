@@ -1,27 +1,16 @@
 <script setup>
-import {computed, onMounted, reactive} from 'vue'
-import {useSteam} from '@/composables/useSteam.js'
+import {computed, reactive} from 'vue'
+import {useStatsAutoLoad} from '@/composables/useStatsAutoLoad.js'
 import {useRouter} from '@/router.js'
+import GameIconImg from '../ui/GameIconImg.vue'
 
-const {state, loadState, fetchAllAchievementsDetailed, getCompletionData} = useSteam()
+const {state, getCompletionData} = useStatsAutoLoad()
 const {navigate} = useRouter()
 
 const failedHeaders = reactive(new Set())
 const failedPortraits = reactive(new Set())
 const FALLBACK_IMG = 'https://placehold.co/600x400'
 
-onMounted(async () => {
-	loadState()
-	// Ensure stats are loaded
-	const now = Date.now()
-	const lastUpdate = state.lastUpdated || 0
-
-	const hasStats = state.games.some(g => g.achievementsList && g.achievementsList.achievements && g.achievementsList.achievements.length > 0)
-
-	if (state.games.length > 0 && (now - lastUpdate > 172800000 || !hasStats)) {
-		await fetchAllAchievementsDetailed()
-	}
-})
 
 // --- Image Handling ---
 const getHeaderUrl = (appid) => {
@@ -283,7 +272,7 @@ const goToEdit = () => {
 				<h3>Top 5 Obsessions</h3>
 				<div class="top-list">
 					<div v-for="game in stats.top5" :key="game.appid" class="top-item">
-						<img :src="getHeaderUrl(game.appid)" class="bg-image" @error="onHeaderError(game.appid)"/>
+						<img :src="getHeaderUrl(game.appid)" class="bg-image" @error="onHeaderError(game.appid)" :alt="'Image for ' + game.name"/>
 						<div class="item-content">
 							<div class="game-name">{{ game.name }}</div>
 							<div class="game-hours">{{ game.hours }}h</div>
@@ -298,7 +287,7 @@ const goToEdit = () => {
 			<h3>🏆 The Trophy Case (Perfect Games)</h3>
 			<div v-if="stats.trophyCase.length" class="trophy-grid">
 				<div v-for="game in stats.trophyCase" :key="game.appid" class="trophy-item">
-					<img :src="getPortraitUrl(game.appid)" loading="lazy" @error="onPortraitError(game.appid)"/>
+					<img :src="getPortraitUrl(game.appid)" loading="lazy" @error="onPortraitError(game.appid)" :alt="'Image for ' + game.name"/>
 					<div class="glow"></div>
 				</div>
 			</div>
@@ -311,8 +300,9 @@ const goToEdit = () => {
 				<h3>🔥 Recently Bingeing</h3>
 				<div class="simple-list">
 					<div v-for="game in stats.recent" :key="game.appid" class="list-row">
-						<img
-								:src="`//media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
+						<GameIconImg
+								:appid="game.appid"
+								:icon-hash="game.img_icon_url"
 								class="icon"/>
 						<span class="name">{{ game.name }}</span>
 						<span class="val">{{ Math.round(game.playtime_2weeks / 60) }}h</span>

@@ -1,9 +1,14 @@
 <script setup>
-import {ref, computed, onMounted, reactive} from 'vue'
-import {useSteam} from '@/composables/useSteam.js'
+import {ref, computed, reactive} from 'vue'
+import {useStatsAutoLoad} from '@/composables/useStatsAutoLoad.js'
+import {useGameInfoModal} from '@/composables/useGameInfoModal.js'
 import GameInfoComponent from '../GameInfoComponent.vue'
+import GameCard from '../ui/GameCard.vue'
+import KanbanColumn from '../ui/KanbanColumn.vue'
+import ViewHeader from "@/components/ui/ViewHeader.vue";
 
-const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed, fetchGameDetails, getCompletionData, updateGameStatus, toggleGameVisibility} = useSteam()
+const {state, refreshLibrary, fetchGameDetails, getCompletionData, updateGameStatus, toggleGameVisibility} = useStatsAutoLoad()
+const {showGameInfo, selectedGame, openGameInfo, closeGameInfo} = useGameInfoModal()
 
 const searchTerm = ref('')
 const showFilters = ref(false)
@@ -12,9 +17,7 @@ const filterCompletion = ref(0) // Min completion %
 const hideNoAchievements = ref(false)
 const hideFree = ref(false)
 
-// Game Info Modal
-const showGameInfo = ref(false)
-const selectedGame = ref(null)
+
 
 // Layout Editor State
 const editingColumns = ref([])
@@ -38,20 +41,7 @@ const touchState = reactive({
 
 let scrollTimer = null;
 
-onMounted(async () => {
-	loadState()
 
-	const now = Date.now()
-	const lastUpdate = state.lastUpdated || 0
-
-	// Check if any game has detailed achievement data loaded
-	const hasStats = state.games.some(g => g.achievementsList && g.achievementsList.achievements && g.achievementsList.achievements.length > 0)
-
-	// Auto-load if stale > 48h
-	if (state.games.length > 0 && (now - lastUpdate > 172800000 || !hasStats)) {
-		await fetchAllAchievementsDetailed()
-	}
-})
 
 const filteredGames = computed(() => {
 	let result = state.games
@@ -246,14 +236,6 @@ const toggleHide = (game) => {
 	toggleGameVisibility(game)
 }
 
-const openGameInfo = (game) => {
-	selectedGame.value = game
-	showGameInfo.value = true
-}
-
-const refreshStats = async () => {
-	await refreshLibrary()
-}
 
 // Layout Editor Logic
 const openLayoutEditor = () => {
@@ -334,37 +316,42 @@ const getColName = (col) => {
 		<GameInfoComponent
 				:game="selectedGame"
 				:is-open="showGameInfo"
-				@close="showGameInfo = false"
+				@close="closeGameInfo"
 		/>
 
-		<div class="controls-bar">
-			<h1>Your Main Board</h1>
-			<div class="search-box">
-				<input v-model="searchTerm" placeholder="Search games..." class="input-field"/>
-			</div>
-			<div class="actions">
-				<button @click="showFilters = !showFilters" class="btn btn-secondary" :class="{ active: showFilters }">
-					<span v-if="showFilters">▼</span><span v-else>►</span> Filters
-				</button>
-				<button @click="openLayoutEditor" class="btn btn-secondary layout-btn">
-					✎ Edit Board
-				</button>
-				<button @click="refreshStats" :disabled="state.loading" class="btn btn-secondary reload-stats-btn">
-					{{ state.loading ? 'Syncing...' : '↻ Sync Library' }}
-				</button>
-			</div>
-		</div>
+		<!-- Header -->
+		<ViewHeader title="Your Main Board">
+			<template #actions>
+				<div class="search-box">
+					<input v-model="searchTerm" placeholder="Search games..." class="input-field"/>
+				</div>
+				<div class="actions">
+					<button @click="showFilters = !showFilters" class="btn btn-secondary" :class="{ active: showFilters }">
+						<span v-if="showFilters">▼</span><span v-else>►</span> Filters
+					</button>
+					<button @click="openLayoutEditor" class="btn btn-secondary layout-btn">
+						✎ Edit Board
+					</button>
+					<button @click="refreshLibrary" :disabled="state.loading" class="btn btn-secondary reload-stats-btn">
+						{{ state.loading ? 'Syncing...' : '↻ Sync Library' }}
+					</button>
+				</div>
+			</template>
+		</ViewHeader>
+		
 
-		<transition name="slide-down">
-			<div v-if="showFilters" class="filters-panel">
-				<label class="filter-check"><input type="checkbox" v-model="hideNoAchievements"> Has Achievements</label>
-				<label class="filter-check"><input type="checkbox" v-model="hideFree"> Played > 0h</label>
-				<div class="slider-control">
-					<span>Min Completion: {{ filterCompletion }}%</span>
-					<input type="range" v-model.number="filterCompletion" min="0" max="100" class="slider">
+		<div class="slide-down-wrapper" :class="{ open: showFilters }">
+			<div class="slide-down-inner">
+				<div class="filters-panel">
+					<label class="filter-check"><input type="checkbox" v-model="hideNoAchievements"> Has Achievements</label>
+					<label class="filter-check"><input type="checkbox" v-model="hideFree"> Played > 0h</label>
+					<div class="slider-control">
+						<span>Min Completion: {{ filterCompletion }}%</span>
+						<input type="range" v-model.number="filterCompletion" min="0" max="100" class="slider">
+					</div>
 				</div>
 			</div>
-		</transition>
+		</div>
 
 		<!-- Layout Editor Modal -->
 		<div v-if="showLayoutEditor" class="modal-overlay">
@@ -404,88 +391,33 @@ const getColName = (col) => {
 				:class="{ 'is-dragging': touchState.active }"
 		>
 			<transition-group name="column-list" tag="div" class="board-flex">
-				<div
-						v-for="(col, index) in state.columns"
+				<KanbanColumn
+						v-for="col in state.columns"
 						:key="getColName(col)"
-						class="kanban-column column"
-						:style="{ borderTopColor: getColColor(col) }"
-						:data-status="getColName(col)"
+						:name="getColName(col)"
+						:color="getColColor(col)"
+						:count="getGamesByStatus(getColName(col)).length"
 						@dragover.prevent
 						@dragenter.prevent
 						@drop="onDrop($event, getColName(col))"
 				>
-					<div class="column-header">
-						<h2>
-							{{ getColName(col) }}
-							<span class="column-count">{{ getGamesByStatus(getColName(col)).length }}</span>
-						</h2>
-					</div>
-
-					<div class="card-list">
-						<transition-group name="card-list">
-							<div
-									v-for="game in getGamesByStatus(getColName(col))"
-									:key="game.appid"
-									class="card-panel card-hover card"
-									draggable="true"
-									@dragstart="onDragStart($event, game)"
-									@touchstart="onTouchStart($event, game)"
-									@touchmove="onTouchMove($event)"
-									@touchend="onTouchEnd($event)"
-							>
-								<div class="card-actions-top">
-									<button @click="openGameInfo(game)" class="hide-btn info-btn" title="More Info">
-										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-											<path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-											<path
-													d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/>
-										</svg>
-									</button>
-									<button @click="toggleHide(game)" class="hide-btn" title="Hide Game">
-										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-											<path
-													d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486l.708.709z"/>
-											<path
-													d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829l.822.822zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/>
-											<path
-													d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/>
-										</svg>
-									</button>
-								</div>
-								<div class="card-header">
-									<img
-											v-if="game.img_icon_url"
-											:src="`//media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`"
-											alt="icon"
-											class="game-icon"
-									/>
-									<span class="game-title">{{ game.name }}</span>
-								</div>
-
-								<div class="stats">
-									<div v-if="getCompletionData(game).total > 0">
-										<div class="achievement-text">
-											<span>{{ getCompletionData(game).achieved }} / {{ getCompletionData(game).total }}</span>
-											<span class="percentage" :style="{ color: col.color }">{{
-													Math.round(getCompletionData(game).achieved / getCompletionData(game).total * 100)
-												}}%</span>
-										</div>
-										<div class="progress-bar">
-											<div class="progress"
-											     :style="{ width: (getCompletionData(game).achieved / getCompletionData(game).total * 100) + '%', background: getColColor(col) }"></div>
-										</div>
-									</div>
-									<div v-else-if="getCompletionData(game).error" class="stat-error">
-										{{ getCompletionData(game).error }}
-									</div>
-									<button v-else @click="fetchGameDetails(game)" :disabled="game.loadingDetails" class="btn btn-secondary btn-small">
-										{{ game.loadingDetails ? '...' : 'Load Stats' }}
-									</button>
-								</div>
-							</div>
-						</transition-group>
-					</div>
-				</div>
+					<GameCard
+							v-for="game in getGamesByStatus(getColName(col))"
+							:key="game.appid"
+							:game="game"
+							:completion-data="getCompletionData(game)"
+							:column-color="getColColor(col)"
+							:loading-details="game.loadingDetails"
+							:draggable="true"
+							@dragstart="onDragStart($event, game)"
+							@touchstart="onTouchStart($event, game)"
+							@touchmove="onTouchMove($event)"
+							@touchend="onTouchEnd($event)"
+							@info="openGameInfo"
+							@hide="toggleHide"
+							@load-stats="fetchGameDetails"
+					/>
+				</KanbanColumn>
 			</transition-group>
 		</div>
 	</div>
