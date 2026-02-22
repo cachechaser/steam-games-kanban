@@ -1,5 +1,5 @@
 <script setup>
-import {computed} from 'vue'
+import {computed, ref} from 'vue'
 import {useSteam} from '../composables/useSteam'
 import AchievementTable from './AchievementTable.vue'
 import GameIconImg from './ui/GameIconImg.vue'
@@ -12,6 +12,22 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const {getCompletionData, updateGameStatus, state} = useSteam()
+
+const sortBy = ref('unlockRate')
+const sortDesc = ref(true)
+
+const handleSort = (field) => {
+	if (sortBy.value === field) {
+		sortDesc.value = !sortDesc.value
+	} else {
+		sortBy.value = field
+		if (field === 'achName') {
+			sortDesc.value = false
+		} else {
+			sortDesc.value = true
+		}
+	}
+}
 
 const stats = computed(() => {
 	if (!props.game) return {total: 0, achieved: 0}
@@ -31,22 +47,35 @@ const averageGlobal = computed(() => {
 
 const sortedAchievements = computed(() => {
 	if (!props.game?.achievementsList?.achievements) return []
-	// Sort by achieved (unlocked first), then unlock time (desc), then global rarity (rare first)
-	const list = [...props.game.achievementsList.achievements].sort((a, b) => {
-		if (a.achieved !== b.achieved) return a.achieved ? -1 : 1
-		if (a.achieved && b.achieved) {
-			return b.unlocktime - a.unlocktime
-		}
-		return a.unlockPercentage - b.unlockPercentage
-	})
 
-	// Map to structure expected by AchievementTable
-	// It expects: appid, gameName, name, description, achieved, unlockTime/unlocktime, icon, iconGray/icongray, unlockPercentage
-	return list.map(ach => ({
+	const list = [...props.game.achievementsList.achievements].map(ach => ({
 		...ach,
 		appid: props.game.appid,
 		gameName: props.game.name
 	}))
+
+	list.sort((a, b) => {
+		let cmp = 0
+		switch (sortBy.value) {
+			case 'achName':
+				cmp = (a.name || '').localeCompare(b.name || '')
+				break
+			case 'unlockRate':
+				cmp = (a.unlockPercentage || 0) - (b.unlockPercentage || 0)
+				break
+			case 'unlockDate': {
+				const tA = a.achieved ? (a.unlocktime || 0) : -1
+				const tB = b.achieved ? (b.unlocktime || 0) : -1
+				cmp = tA - tB
+				break
+			}
+			default:
+				cmp = (a.unlockPercentage || 0) - (b.unlockPercentage || 0)
+		}
+		return sortDesc.value ? -cmp : cmp
+	})
+
+	return list
 })
 
 const close = () => {
@@ -104,10 +133,13 @@ const close = () => {
 						No achievement data available.
 					</div>
 
-					<AchievementTable
+				<AchievementTable
 							:achievements="sortedAchievements"
 							:show-game-column="false"
-					/>
+							:sort-by="sortBy"
+							:sort-desc="sortDesc"
+							@sort="handleSort"
+						/>
 				</div>
 			</div>
 		</div>
