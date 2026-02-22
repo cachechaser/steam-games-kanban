@@ -1,6 +1,6 @@
 <script setup>
 import {ref, computed, onMounted} from 'vue'
-import {useSteam} from '../composables/useSteam'
+import {useSteam} from '@/composables/useSteam.js'
 
 const {state, loadState, fetchGames, clearData, toggleGameVisibility, setGamesVisibility} = useSteam()
 

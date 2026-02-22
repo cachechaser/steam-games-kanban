@@ -1,7 +1,7 @@
 <script setup>
 import {computed, onMounted, reactive} from 'vue'
-import {useSteam} from '../composables/useSteam'
-import {useRouter} from '../router'
+import {useSteam} from '@/composables/useSteam.js'
+import {useRouter} from '@/router.js'
 
 const {state, loadState, fetchAllAchievementsDetailed, getCompletionData} = useSteam()
 const {navigate} = useRouter()
@@ -122,9 +122,9 @@ const stats = computed(() => {
 
 	// Trophy Case (Perfect Games)
 	const trophyCase = games.filter(g => {
-	        const achData = getCompletionData(g)
-			return achData && !achData.error && achData.total > 0 && achData.achieved === achData.total
-    });
+		const achData = getCompletionData(g)
+		return achData && !achData.error && achData.total > 0 && achData.achieved === achData.total
+	});
 
 	// Graveyard (< 2h played, > 0)
 	const graveyard = games.filter(g => {

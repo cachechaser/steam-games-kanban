@@ -1,7 +1,7 @@
 <script setup>
 import {ref, computed, onMounted, reactive} from 'vue'
-import {useSteam} from '../composables/useSteam'
-import GameInfoComponent from './GameInfoComponent.vue'
+import {useSteam} from '@/composables/useSteam.js'
+import GameInfoComponent from '../GameInfoComponent.vue'
 
 const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed, fetchGameDetails, getCompletionData, updateGameStatus, toggleGameVisibility} = useSteam()
 

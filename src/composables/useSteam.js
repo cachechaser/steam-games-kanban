@@ -1,4 +1,4 @@
-import {ref, computed, watch, reactive, toRaw} from 'vue'
+import {reactive, toRaw, watch} from 'vue'
 
 const STATE_KEY = 'steam_kanban_state'
 
@@ -221,7 +221,7 @@ const fetchGames = async () => {
             const existingMap = new Map(state.games.map(g => [g.appid, g]))
             let hasUpdates = false
 
-            const newGames = data.response.games.map(g => {
+            state.games = data.response.games.map(g => {
                 const existing = existingMap.get(g.appid)
 
                 // Determine if we need to update achievements
@@ -255,8 +255,6 @@ const fetchGames = async () => {
                     needsUpdate: needsUpdate // Flag for detailed fetcher
                 }
             })
-
-            state.games = newGames
 
             await saveAllGamesToDB(state.games)
 

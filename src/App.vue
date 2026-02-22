@@ -1,15 +1,15 @@
 <script setup>
-import {onMounted, computed, ref} from 'vue'
+import {computed, onMounted, ref} from 'vue'
 import {useRouter} from './router'
 import {useSteam} from './composables/useSteam'
 import NavBar from './components/NavBar.vue'
 import Footer from './components/Footer.vue'
-import BoardView from './components/BoardView.vue'
-import ProfileView from './components/ProfileView.vue'
-import ProfileEditView from './components/ProfileEditView.vue'
-import CompletionView from './components/CompletionView.vue'
-import AchievementView from './components/AchievementView.vue'
-import HomeView from './components/HomeView.vue'
+import BoardView from './components/views/BoardView.vue'
+import ProfileView from './components/views/ProfileView.vue'
+import ProfileEditView from './components/views/ProfileEditView.vue'
+import CompletionView from './components/views/CompletionView.vue'
+import AchievementView from './components/views/AchievementView.vue'
+import HomeView from './components/views/HomeView.vue'
 
 const {currentView, navigate} = useRouter()
 const {state, loadState, fetchGames} = useSteam()
@@ -42,8 +42,7 @@ const currentComponent = computed(() => {
 })
 
 const getQueryParams = () => {
-	const params = new URLSearchParams(window.location.search);
-	return params;
+	return new URLSearchParams(window.location.search);
 }
 
 const checkOpenIdReturn = async () => {
@@ -69,7 +68,7 @@ const checkOpenIdReturn = async () => {
 }
 
 onMounted(async () => {
-	loadState()
+	await loadState()
 	await checkOpenIdReturn()
 	isInitialized.value = true
 })

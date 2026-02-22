@@ -1,8 +1,8 @@
 <script setup>
 import {ref, computed, onMounted} from 'vue'
-import {useSteam} from '../composables/useSteam'
-import GameInfoComponent from './GameInfoComponent.vue'
-import AchievementTable from './AchievementTable.vue'
+import {useSteam} from '@/composables/useSteam.js'
+import GameInfoComponent from '../GameInfoComponent.vue'
+import AchievementTable from '../AchievementTable.vue'
 
 const {state, loadState, refreshLibrary, fetchAllAchievementsDetailed} = useSteam()
 
