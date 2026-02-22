@@ -21,11 +21,7 @@ const handleSort = (field) => {
 		sortDesc.value = !sortDesc.value
 	} else {
 		sortBy.value = field
-		if (field === 'achName') {
-			sortDesc.value = false
-		} else {
-			sortDesc.value = true
-		}
+		sortDesc.value = field !== 'achName';
 	}
 }
 
@@ -55,7 +51,7 @@ const sortedAchievements = computed(() => {
 	}))
 
 	list.sort((a, b) => {
-		let cmp = 0
+		let cmp
 		switch (sortBy.value) {
 			case 'achName':
 				cmp = (a.name || '').localeCompare(b.name || '')
