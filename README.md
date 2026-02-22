@@ -73,7 +73,7 @@ I have big plans to make this a useful tool for Steam power users. Here is what 
 - **ProtonDB & Steam Deck Status**: Automatically tag games with their Steam Deck verification status (Verified, Playable, Unsupported) and ProtonDB rating.
 - **Metacritic/SteamDB/Steam Store Scores**: Overlay review scores to help you decide which masterpiece to play next.
 - **More pre-filtered dashboards**: Application sorts your library for you.
-- **Achievements-based dashboard**: Well, the current AchievementView will be renamed to CompletionView. Inspired by
+- [x] **Achievements-based dashboard**: Well, the current AchievementView will be renamed to CompletionView. Inspired by
   [Completionists Achievements Overview](https://completionist.me/steam/achievements) there will be a new dashboard
   that lists your achievements and sorts them by rarity, game completion percentage/status, or how long ago you earned
   them. This will help you find those rare achievements you forgot about and give you a new way to explore your
