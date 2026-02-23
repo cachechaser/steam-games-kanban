@@ -14,6 +14,10 @@ const props = defineProps({
 		type: Boolean,
 		default: true
 	},
+	visibleColumns: {
+		type: Array,
+		default: () => ['game', 'achievement', 'unlockRate', 'unlockDate']
+	},
 	sortBy: {
 		type: String,
 		default: ''
@@ -25,6 +29,21 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['sort', 'game-click'])
+
+const isVisible = (key) => props.visibleColumns.includes(key)
+
+const colCount = () => {
+	let count = 0
+	if (props.showGameColumn && isVisible('game')) count++
+	if (isVisible('achievement')) count++
+	if (isVisible('rarityTier')) count++
+	if (isVisible('unlockRate')) count++
+	if (isVisible('avgGlobalRarity')) count++
+	if (isVisible('gameCompletion')) count++
+	if (isVisible('playtime')) count++
+	if (isVisible('unlockDate')) count++
+	return count || 1
+}
 
 const handleSort = (field) => {
 	emit('sort', field)
@@ -40,6 +59,12 @@ const getIconUrl = (ach) => {
 	if (url.startsWith('http')) return url
 	return `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${ach.appid}/${url}.jpg`
 }
+
+const formatPlaytime = (minutes) => {
+	if (!minutes) return '0h'
+	if (minutes < 60) return `${minutes}m`
+	return `${(minutes / 60).toFixed(1)}h`
+}
 </script>
 
 <template>
@@ -47,19 +72,35 @@ const getIconUrl = (ach) => {
 		<table class="ach-table">
 			<thead>
 			<tr>
-				<th v-if="showGameColumn" @click="handleSort('gameName')" :class="['game-cell', {sorted: sortBy === 'gameName'}]">
+				<th v-if="showGameColumn && isVisible('game')" @click="handleSort('gameName')" :class="['game-cell', {sorted: sortBy === 'gameName'}]">
 					Game
 					<span class="sort-icon">{{ sortBy === 'gameName' ? (sortDesc ? '▼' : '▲') : '' }}</span>
 				</th>
-				<th @click="handleSort('achName')" :class="{sorted: sortBy === 'achName'}">
+				<th v-if="isVisible('achievement')" @click="handleSort('achName')" :class="{sorted: sortBy === 'achName'}">
 					Achievement
 					<span class="sort-icon">{{ sortBy === 'achName' ? (sortDesc ? '▼' : '▲') : '' }}</span>
 				</th>
-				<th @click="handleSort('unlockRate')" :class="{sorted: sortBy === 'unlockRate'}" class="text-right">
+				<th v-if="isVisible('rarityTier')" @click="handleSort('rarityTier')" :class="['text-center', {sorted: sortBy === 'rarityTier'}]">
+					Rarity
+					<span class="sort-icon">{{ sortBy === 'rarityTier' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+				</th>
+				<th v-if="isVisible('unlockRate')" @click="handleSort('unlockRate')" :class="{sorted: sortBy === 'unlockRate'}" class="text-right">
 					Global %
 					<span class="sort-icon">{{ sortBy === 'unlockRate' ? (sortDesc ? '▼' : '▲') : '' }}</span>
 				</th>
-				<th @click="handleSort('unlockDate')" :class="{sorted: sortBy === 'unlockDate'}" class="text-right">
+				<th v-if="isVisible('avgGlobalRarity')" @click="handleSort('avgGlobalRarity')" :class="['text-right', {sorted: sortBy === 'avgGlobalRarity'}]">
+					Avg. Global Rarity
+					<span class="sort-icon">{{ sortBy === 'avgGlobalRarity' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+				</th>
+				<th v-if="isVisible('gameCompletion')" @click="handleSort('gameCompletion')" :class="['text-right', {sorted: sortBy === 'gameCompletion'}]">
+					Game Completion
+					<span class="sort-icon">{{ sortBy === 'gameCompletion' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+				</th>
+				<th v-if="isVisible('playtime')" @click="handleSort('playtime')" :class="['text-right', {sorted: sortBy === 'playtime'}]">
+					Playtime
+					<span class="sort-icon">{{ sortBy === 'playtime' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+				</th>
+				<th v-if="isVisible('unlockDate')" @click="handleSort('unlockDate')" :class="{sorted: sortBy === 'unlockDate'}" class="text-right">
 					Unlock Date
 					<span class="sort-icon">{{ sortBy === 'unlockDate' ? (sortDesc ? '▼' : '▲') : '' }}</span>
 				</th>
@@ -67,12 +108,12 @@ const getIconUrl = (ach) => {
 			</thead>
 			<tbody>
 			<tr v-if="achievements.length === 0">
-				<td :colspan="showGameColumn ? 4 : 3" class="empty-state">
+				<td :colspan="colCount()" class="empty-state">
 					{{ loading ? 'Loading data...' : 'No achievements found.' }}
 				</td>
 			</tr>
 			<tr v-for="ach in achievements" :key="`${ach.appid}-${ach.apiname}`" :class="{locked: !ach.achieved}">
-				<td v-if="showGameColumn" class="game-cell">
+				<td v-if="showGameColumn && isVisible('game')" class="game-cell">
 					<div class="game-info" @click="onGameClick(ach)" style="cursor: pointer;">
 						<span class="game-name">{{ ach.gameName }}</span>
 						<span class="game-info-icon" title="Game Info">
@@ -80,7 +121,7 @@ const getIconUrl = (ach) => {
 						</span>
 					</div>
 				</td>
-				<td class="desc-cell">
+				<td v-if="isVisible('achievement')" class="desc-cell">
 					<div class="ach-content-wrapper">
 						<img :src="getIconUrl(ach)" class="ach-img" alt="" loading="lazy"/>
 						<div class="ach-text">
@@ -89,10 +130,32 @@ const getIconUrl = (ach) => {
 						</div>
 					</div>
 				</td>
-				<td class="rate-cell">
+				<td v-if="isVisible('rarityTier')" class="rarity-cell">
+					<span v-if="ach.rarityTier" class="rarity-badge" :style="{ color: ach.rarityTier.color, borderColor: ach.rarityTier.color }">
+						{{ ach.rarityTier.label }}
+					</span>
+				</td>
+				<td v-if="isVisible('unlockRate')" class="rate-cell">
 					<span class="rate-badge">{{ (ach.unlockPercentage || 0).toFixed(1) }}%</span>
 				</td>
-				<td class="date-cell">
+				<td v-if="isVisible('avgGlobalRarity')" class="avg-rarity-cell">
+					<span class="avg-rarity-badge">{{ ach.avgGlobalRarity != null ? ach.avgGlobalRarity.toFixed(1) : '–' }}%</span>
+				</td>
+				<td v-if="isVisible('gameCompletion')" class="completion-cell">
+					<template v-if="ach.gameCompletion">
+						<div class="completion-info">
+							<span class="completion-text">{{ ach.gameCompletion.achieved }}/{{ ach.gameCompletion.total }}</span>
+							<span class="completion-pct">{{ ach.gameCompletion.percent }}%</span>
+						</div>
+						<div class="completion-bar">
+							<div class="completion-fill" :style="{ width: ach.gameCompletion.percent + '%' }"></div>
+						</div>
+					</template>
+				</td>
+				<td v-if="isVisible('playtime')" class="playtime-cell">
+					<span class="playtime-text">{{ formatPlaytime(ach.gamePlaytime) }}</span>
+				</td>
+				<td v-if="isVisible('unlockDate')" class="date-cell">
                     <span v-if="ach.achieved && (ach.unlockTime || ach.unlocktime)" class="unlock-date">
                         {{ new Date((ach.unlockTime || ach.unlocktime) * 1000).toLocaleDateString() }}
                     </span>
@@ -130,6 +193,7 @@ const getIconUrl = (ach) => {
 	top: 0;
 	backdrop-filter: blur(8px) brightness(90%);
 	z-index: 1;
+	white-space: nowrap;
 }
 
 .ach-table th:hover {
@@ -139,6 +203,10 @@ const getIconUrl = (ach) => {
 
 .ach-table th.text-right {
 	text-align: right;
+}
+
+.ach-table th.text-center {
+	text-align: center;
 }
 
 .ach-table th.sorted {
@@ -226,7 +294,7 @@ const getIconUrl = (ach) => {
 }
 
 .desc-cell {
-	width: 50%;
+	min-width: 200px;
 }
 
 .ach-title {
@@ -244,6 +312,20 @@ const getIconUrl = (ach) => {
 	overflow: hidden;
 }
 
+.rarity-cell {
+	text-align: center;
+	white-space: nowrap;
+}
+
+.rarity-badge {
+	font-size: 0.8rem;
+	font-weight: bold;
+	padding: 3px 8px;
+	border-radius: 10px;
+	border: 1px solid;
+	background: rgba(0, 0, 0, 0.2);
+}
+
 .rate-cell {
 	text-align: right;
 	width: 100px;
@@ -256,6 +338,63 @@ const getIconUrl = (ach) => {
 	border-radius: 4px;
 	font-size: 0.85rem;
 	font-weight: bold;
+}
+
+.avg-rarity-cell {
+	text-align: right;
+	white-space: nowrap;
+	width: 100px;
+}
+
+.avg-rarity-badge {
+	font-size: 0.85rem;
+	color: var(--steam-text-muted);
+}
+
+.completion-cell {
+	text-align: right;
+	min-width: 120px;
+}
+
+.completion-info {
+	display: flex;
+	justify-content: flex-end;
+	gap: 6px;
+	font-size: 0.8rem;
+	margin-bottom: 3px;
+}
+
+.completion-text {
+	color: var(--steam-text-muted);
+}
+
+.completion-pct {
+	color: var(--steam-blue-light);
+	font-weight: bold;
+}
+
+.completion-bar {
+	height: 4px;
+	background: rgba(255, 255, 255, 0.08);
+	border-radius: 2px;
+	overflow: hidden;
+}
+
+.completion-fill {
+	height: 100%;
+	background: var(--steam-blue-light);
+	border-radius: 2px;
+	transition: width 0.3s ease;
+}
+
+.playtime-cell {
+	text-align: right;
+	white-space: nowrap;
+}
+
+.playtime-text {
+	font-size: 0.85rem;
+	color: var(--steam-text-muted);
 }
 
 .date-cell {

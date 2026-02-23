@@ -581,6 +581,7 @@ a:hover {
 .column-tags {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .col-tag {
@@ -601,6 +602,51 @@ a:hover {
     background: rgba(102, 192, 244, 0.2);
     border-color: var(--steam-blue-light);
     color: var(--steam-blue-light);
+  }
+
+  &.locked {
+    opacity: 0.5;
+    cursor: default;
+
+    &:hover {
+      border-color: rgba(255,255,255,0.1);
+    }
+  }
+}
+
+.filter-group-wide {
+  flex-basis: 100%;
+}
+
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--steam-blue-light);
+  color: #1b2838;
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 0 5px;
+  margin-left: 4px;
+}
+
+.input-small {
+  padding: 5px 10px;
+  font-size: 0.85rem;
+  max-width: 200px;
+}
+
+.range-slider-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .slider {
+    flex: 1;
+    min-width: 80px;
   }
 }
 
