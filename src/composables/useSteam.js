@@ -438,6 +438,120 @@ const setGamesVisibility = async (games, isHidden) => {
     await saveAllGamesToDB(state.games)
 }
 
+/**
+ * Import Steam collections from the local extraction script output.
+ * Each collection becomes a kanban column, and games are moved into it.
+ *
+ * @param {Object} data - Parsed JSON from the extraction script
+ * @param {Array} data.collections - Array of { name: string, game_ids: number[] }
+ * @param {'add'|'replace'} mode
+ *   - 'add': keep existing columns, add new collection columns and sort games in
+ *   - 'replace': remove all non-Backlog columns, replace with collection columns,
+ *                 games not in any collection fall back to "Backlog"
+ * @param {boolean} onlyUnassigned - If true, only move games currently in "Backlog"
+ * @returns {{ columnsCreated: string[], columnsRemoved: string[], gamesMoved: number, gamesReset: number, gamesNotFound: number }}
+ */
+const importCollections = async (data, mode = 'add', onlyUnassigned = false) => {
+    if (!data || !Array.isArray(data.collections)) {
+        throw new Error('Invalid import data: expected { collections: [...] }')
+    }
+
+    let columnsCreated = []
+    let columnsRemoved = []
+    let gamesMoved = 0
+    let gamesReset = 0
+    let gamesNotFound = 0
+
+    // Collect all collection names and build a set of all game ids mentioned
+    const collectionNames = data.collections
+        .filter(c => c.name && (c.game_ids || []).length > 0)
+        .map(c => c.name)
+
+    if (mode === 'replace') {
+        // Ensure "Backlog" always exists
+        const newColumns = ['Backlog']
+        for (const name of collectionNames) {
+            if (name !== 'Backlog' && !newColumns.includes(name)) {
+                newColumns.push(name)
+            }
+        }
+
+        // Track removed columns
+        columnsRemoved = state.columns.filter(c => !newColumns.includes(c))
+
+        // Replace columns list
+        state.columns.splice(0, state.columns.length, ...newColumns)
+        columnsCreated = newColumns.filter(c => c !== 'Backlog')
+
+        // Build a map: appid -> collection name (last collection wins if game is in multiple)
+        const gameToColumn = new Map()
+        for (const collection of data.collections) {
+            const colName = collection.name
+            const gameIds = collection.game_ids || []
+            if (!colName || gameIds.length === 0) continue
+
+            for (const appid of gameIds) {
+                gameToColumn.set(appid, colName)
+            }
+        }
+
+        // Assign every game
+        for (const game of state.games) {
+            const targetCol = gameToColumn.get(game.appid)
+            if (targetCol) {
+                if (game.status !== targetCol) {
+                    game.status = targetCol
+                    gamesMoved++
+                }
+            } else {
+                // Game not in any collection -> reset to Backlog
+                if (game.status !== 'Backlog') {
+                    game.status = 'Backlog'
+                    gamesReset++
+                }
+            }
+        }
+    } else {
+        // 'add' mode: keep existing columns, add new ones, sort games in
+        for (const collection of data.collections) {
+            const colName = collection.name
+            const gameIds = collection.game_ids || []
+
+            if (!colName || gameIds.length === 0) continue
+
+            // Create column if it doesn't exist
+            if (!state.columns.includes(colName)) {
+                addColumn(colName)
+                columnsCreated.push(colName)
+            }
+
+            // Assign games to the column
+            for (const appid of gameIds) {
+                const game = state.games.find(g => g.appid === appid)
+                if (!game) {
+                    gamesNotFound++
+                    continue
+                }
+
+                // Skip if only assigning unassigned games and game is not in Backlog
+                if (onlyUnassigned && game.status !== 'Backlog') continue
+
+                // Skip if game is already in this column
+                if (game.status === colName) continue
+
+                game.status = colName
+                gamesMoved++
+            }
+        }
+    }
+
+    // Batch save all games
+    await saveAllGamesToDB(state.games)
+    saveMetadata()
+
+    return {columnsCreated, columnsRemoved, gamesMoved, gamesReset, gamesNotFound}
+}
+
 export function useSteam() {
     return {
         state,
@@ -452,6 +566,7 @@ export function useSteam() {
         updateGameStatus,
         toggleGameVisibility,
         setGameVisibility,
-        setGamesVisibility
+        setGamesVisibility,
+        importCollections
     }
 }
