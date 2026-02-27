@@ -1,13 +1,14 @@
 <script setup>
-import InfoIcon from '../icons/InfoIcon.vue'
 import HideIcon from '../icons/HideIcon.vue'
+import InfoIcon from "@/components/icons/InfoIcon.vue";
 
 const props = defineProps({
 	game: {type: Object, required: true},
 	completionData: {type: Object, required: true},
 	columnColor: {type: String, default: '#66c0f4'},
 	draggable: {type: Boolean, default: false},
-	loadingDetails: {type: Boolean, default: false}
+	loadingDetails: {type: Boolean, default: false},
+	isDuplicate: {type: Boolean, default: false}
 })
 
 const emit = defineEmits(['info', 'hide', 'load-stats'])
@@ -31,22 +32,25 @@ const completionWidth = () => {
 </script>
 
 <template>
-	<div class="card-panel card-hover card" :draggable="draggable">
+	<div class="card-panel card-hover card" :draggable="draggable" :class="{ 'is-duplicate': isDuplicate }">
 		<div class="card-actions-top">
-			<button @click="emit('info', game)" class="hide-btn" title="More Info">
+			<button @click.stop="emit('info', game)" class="hide-btn" title="Show Game Info">
 				<InfoIcon/>
 			</button>
-			<button @click="emit('hide', game)" class="hide-btn" title="Hide Game">
+			<button @click.stop="emit('hide', game)" class="hide-btn" title="Hide Game">
 				<HideIcon/>
 			</button>
 		</div>
 		<div class="card-header">
-			<img
-					v-if="game.img_icon_url"
-					:src="gameIconUrl(game)"
-					alt="icon"
-					class="game-icon"
-			/>
+			<div class="game-icon-wrapper">
+				<img
+						v-if="game.img_icon_url"
+						:src="gameIconUrl(game)"
+						alt="icon"
+						class="game-icon"
+				/>
+				<span v-if="isDuplicate" class="duplicate-badge" title="This game appears in multiple columns">⧉</span>
+			</div>
 			<span class="game-title">{{ game.name }}</span>
 		</div>
 

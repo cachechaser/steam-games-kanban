@@ -12,6 +12,9 @@ const {
 	toggleGameVisibility,
 	setGamesVisibility,
 	importCollections,
+	isGameDuplicated,
+	getGameColumns,
+	removeGameFromColumn,
 } = useSteam();
 const {loginWithSteam: loginWithSteamRaw} = useSteamLogin();
 
@@ -391,6 +394,9 @@ const handleFileUpload = (event) => {
 						<span class="name">{{ game.name }}</span>
 						<div class="game-actions">
 							<span class="status-tag">{{ game.status }}</span>
+							<span v-if="isGameDuplicated(game)" class="status-tag" style="color: var(--steam-blue-light); font-size: 0.75rem;" title="In multiple columns">
+								+{{ game.duplicateColumns.length }}
+							</span>
 							<button
 									@click="toggleHide(game)"
 									class="btn btn-secondary btn-small toggle-btn"

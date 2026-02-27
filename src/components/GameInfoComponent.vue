@@ -11,10 +11,11 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const {getCompletionData, updateGameStatus, state} = useSteam()
+const {getCompletionData, updateGameStatus, state, copyGameToColumn, removeGameFromColumn, getGameColumns} = useSteam()
 
 const sortBy = ref('unlockRate')
 const sortDesc = ref(true)
+const dropdownOpen = ref(false)
 
 const handleSort = (field) => {
 	if (sortBy.value === field) {
@@ -40,6 +41,31 @@ const averageGlobal = computed(() => {
 	const total = props.game.achievementsList.achievements.reduce((acc, ach) => acc + (ach.unlockPercentage || 0), 0)
 	return (total / props.game.achievementsList.achievements.length).toFixed(1)
 })
+
+const allColumnNames = computed(() => {
+	return state.columns.map(c => typeof c === 'string' ? c : c.name)
+})
+
+const gameColumns = computed(() => {
+	if (!props.game) return []
+	return getGameColumns(props.game)
+})
+
+const toggleColumn = (col) => {
+	if (!props.game) return
+	if (gameColumns.value.includes(col)) {
+		if (gameColumns.value.length <= 1) return
+		removeGameFromColumn(props.game, col)
+	} else {
+		copyGameToColumn(props.game, col)
+	}
+}
+
+const handleRemoveColumnTag = (col) => {
+	if (!props.game) return
+	if (gameColumns.value.length <= 1) return
+	removeGameFromColumn(props.game, col)
+}
 
 const sortedAchievements = computed(() => {
 	if (!props.game?.achievementsList?.achievements) return []
@@ -96,11 +122,28 @@ const close = () => {
 					<div class="header-text">
 						<h2>{{ game.name }}</h2>
 						<div class="badges">
-							<select v-model="game.status" @change="updateGameStatus(game, game.status)" class="status-select">
-								<option v-for="col in state.columns" :key="typeof col === 'string' ? col : col.name" :value="typeof col === 'string' ? col : col.name">
-									{{ typeof col === 'string' ? col : col.name }}
-								</option>
-							</select>
+							<!-- Checkbox dropdown -->
+							<div class="checkbox-dropdown" v-click-outside="() => dropdownOpen = false">
+								<button class="btn btn-secondary btn-sm" @click="dropdownOpen = !dropdownOpen">
+									⊞ Manage Columns ▾
+								</button>
+								<div v-if="dropdownOpen" class="dropdown-menu">
+									<label
+											v-for="col in allColumnNames"
+											:key="col"
+											class="dropdown-item"
+											:class="{ disabled: gameColumns.includes(col) && gameColumns.length <= 1 }"
+									>
+										<input
+												type="checkbox"
+												:checked="gameColumns.includes(col)"
+												:disabled="gameColumns.includes(col) && gameColumns.length <= 1"
+												@change="toggleColumn(col)"
+										/>
+										{{ col }}
+									</label>
+								</div>
+							</div>
 							<span class="playtime-badge">🕒 {{ (game.playtime_forever / 60).toFixed(1) }}h</span>
 						</div>
 					</div>
@@ -129,13 +172,13 @@ const close = () => {
 						No achievement data available.
 					</div>
 
-				<AchievementTable
+					<AchievementTable
 							:achievements="sortedAchievements"
 							:show-game-column="false"
 							:sort-by="sortBy"
 							:sort-desc="sortDesc"
 							@sort="handleSort"
-						/>
+					/>
 				</div>
 			</div>
 		</div>
@@ -193,20 +236,66 @@ const close = () => {
 	display: flex;
 	gap: 10px;
 	align-items: center;
+	flex-wrap: wrap;
 }
 
-.status-select {
-	font-size: 0.85rem;
-	padding: 4px 8px;
-	background: rgba(0, 0, 0, 0.3);
-	border: 1px solid rgba(255, 255, 255, 0.1);
+.checkbox-dropdown {
+	position: relative;
+	display: inline-block;
+}
+
+.dropdown-trigger {
+	font-size: 0.78rem;
+	padding: 3px 8px;
+	background: rgba(102, 192, 244, 0.08);
+	border: 1px solid rgba(102, 192, 244, 0.25);
 	border-radius: 4px;
+	color: #66c0f4;
+	cursor: pointer;
+	transition: background 0.2s;
+
+	&:hover {
+		background: rgba(102, 192, 244, 0.18);
+	}
+}
+
+.dropdown-menu {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 100;
+	background: #1b2838;
+	border: 1px solid rgba(102, 192, 244, 0.25);
+	border-radius: 5px;
+	padding: 6px 0;
+	min-width: 160px;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.dropdown-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 5px 12px;
+	font-size: 0.82rem;
 	color: #c7d5e0;
 	cursor: pointer;
-}
+	user-select: none;
+	transition: background 0.15s;
 
-.status-select option {
-	background: #1b2838;
+	&:hover {
+		background: rgba(102, 192, 244, 0.1);
+	}
+
+	&.disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	input[type="checkbox"] {
+		accent-color: #66c0f4;
+		cursor: pointer;
+	}
 }
 
 .playtime-badge {

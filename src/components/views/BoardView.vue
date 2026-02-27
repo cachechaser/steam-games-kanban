@@ -7,7 +7,7 @@ import GameCard from '../ui/GameCard.vue'
 import KanbanColumn from '../ui/KanbanColumn.vue'
 import ViewHeader from "@/components/ui/ViewHeader.vue";
 
-const {state, refreshLibrary, fetchGameDetails, getCompletionData, updateGameStatus, toggleGameVisibility} = useStatsAutoLoad()
+const {state, refreshLibrary, fetchGameDetails, getCompletionData, updateGameStatus, toggleGameVisibility, copyGameToColumn, removeGameFromColumn} = useStatsAutoLoad()
 const {showGameInfo, selectedGame, openGameInfo, closeGameInfo} = useGameInfoModal()
 
 const searchTerm = ref('')
@@ -16,6 +16,12 @@ const showLayoutEditor = ref(false)
 const filterCompletion = ref(0) // Min completion %
 const hideNoAchievements = ref(false)
 const hideFree = ref(false)
+
+// Drag state
+const isDragging = ref(false)
+const isShiftHeld = ref(false)
+const draggedGameIsDuplicate = ref(false)
+const dragSourceColumn = ref('')
 
 
 
@@ -30,6 +36,7 @@ const boardContainerRef = ref(null)
 const touchState = reactive({
 	active: false,
 	game: null,
+	sourceColumn: '',
 	timer: null,
 	initialX: 0,
 	initialY: 0,
@@ -71,31 +78,83 @@ const filteredGames = computed(() => {
 })
 
 const getGamesByStatus = (status) => {
-	return filteredGames.value.filter(g => g.status === status)
+	return filteredGames.value.filter(g => {
+		return g.status === status || (g.duplicateColumns && g.duplicateColumns.includes(status))
+	})
 }
 
-const onDragStart = (evt, game) => {
-	evt.dataTransfer.dropEffect = 'move'
-	evt.dataTransfer.effectAllowed = 'move'
+const isGameDuplicateInColumn = (game, columnName) => {
+	// A game is a "duplicate" in a column if it appears in multiple columns
+	const cols = [game.status, ...(game.duplicateColumns || [])]
+	return cols.length > 1 && cols.includes(columnName)
+}
+
+const onDragStart = (evt, game, columnName) => {
+	isDragging.value = true
+	isShiftHeld.value = evt.shiftKey
+	dragSourceColumn.value = columnName
+	const cols = [game.status, ...(game.duplicateColumns || [])]
+	draggedGameIsDuplicate.value = cols.length > 1
+	evt.dataTransfer.dropEffect = evt.shiftKey ? 'copy' : 'move'
+	evt.dataTransfer.effectAllowed = 'copyMove'
 	evt.dataTransfer.setData('gameId', game.appid.toString())
+	evt.dataTransfer.setData('sourceColumn', columnName)
+	
+	const onKeyDown = (e) => {
+		if (e.key === 'Shift') isShiftHeld.value = true
+	}
+	const onKeyUp = (e) => {
+		if (e.key === 'Shift') isShiftHeld.value = false
+	}
+	window.addEventListener('keydown', onKeyDown)
+	window.addEventListener('keyup', onKeyUp)
+
+	// Clean up on drag end
+	const cleanup = () => {
+		isDragging.value = false
+		isShiftHeld.value = false
+		draggedGameIsDuplicate.value = false
+		dragSourceColumn.value = ''
+		window.removeEventListener('keydown', onKeyDown)
+		window.removeEventListener('keyup', onKeyUp)
+		evt.target.removeEventListener('dragend', cleanup)
+	}
+	evt.target.addEventListener('dragend', cleanup)
 }
 
 const onDrop = (evt, status) => {
 	const gameId = evt.dataTransfer.getData('gameId')
 	const game = state.games.find(g => g.appid.toString() === gameId)
 	if (game) {
-		updateGameStatus(game, status)
+		if (isShiftHeld.value || evt.shiftKey) {
+			copyGameToColumn(game, status)
+		} else {
+			if (game.duplicateColumns && game.duplicateColumns.includes(status)) {
+				// Moving to a column where it's already a duplicate — promote it and remove duplicate entry
+				game.duplicateColumns = game.duplicateColumns.filter(c => c !== status)
+			}
+			updateGameStatus(game, status)
+		}
 	}
+	isDragging.value = false
+	isShiftHeld.value = false
+	draggedGameIsDuplicate.value = false
+	dragSourceColumn.value = ''
 }
 
 // --- Touch Drag Logic ---
-const onTouchStart = (evt, game) => {
+const onTouchStart = (evt, game, columnName) => {
 	// Only start if one finger
 	if (evt.touches.length > 1) return
 
 	touchState.initialX = evt.touches[0].clientX
 	touchState.initialY = evt.touches[0].clientY
 	touchState.game = game
+	touchState.sourceColumn = columnName
+
+	// Track duplicate state for bin display
+	const cols = [game.status, ...(game.duplicateColumns || [])]
+	draggedGameIsDuplicate.value = cols.length > 1
 
 	// Start timer for long press (reduced to 200ms for responsiveness)
 	touchState.timer = setTimeout(() => {
@@ -106,6 +165,7 @@ const onTouchStart = (evt, game) => {
 const onTouchMove = (evt) => {
 	if (touchState.active) {
 		if (evt.cancelable) evt.preventDefault() // Prevent scrolling
+		
 		const touch = evt.touches[0]
 		if (touchState.element) {
 			touchState.element.style.left = (touch.clientX - touchState.offsetX) + 'px'
@@ -170,17 +230,27 @@ const onTouchEnd = (evt) => {
 		const target = document.elementFromPoint(touch.clientX, touch.clientY)
 		touchState.element.style.display = 'block'
 
-		// Traverse up to find a column with data-status
-		const col = target?.closest('.kanban-column')
-		if (col) {
-			const status = col.getAttribute('data-status')
-			if (status && touchState.game) {
-				updateGameStatus(touchState.game, status)
+		// Check if dropped on the bin
+		const bin = target?.closest('.drag-bin')
+		if (bin && touchState.game && touchState.sourceColumn) {
+			const cols = [touchState.game.status, ...(touchState.game.duplicateColumns || [])]
+			if (cols.length > 1) {
+				removeGameFromColumn(touchState.game, touchState.sourceColumn)
+			}
+		} else {
+			// Traverse up to find a column with data-status
+			const col = target?.closest('.kanban-column')
+			if (col) {
+				const status = col.getAttribute('data-status')
+				if (status && touchState.game) {
+					updateGameStatus(touchState.game, status)
+				}
 			}
 		}
 
 		stopTouchDrag()
 	}
+	draggedGameIsDuplicate.value = false
 }
 
 const startTouchDrag = (evt) => {
@@ -221,6 +291,7 @@ const stopTouchDrag = () => {
 		touchState.element = null
 	}
 	touchState.game = null
+	touchState.sourceColumn = ''
 	stopScrolling();
 }
 
@@ -234,6 +305,41 @@ const stopScrolling = () => {
 
 const toggleHide = (game) => {
 	toggleGameVisibility(game)
+}
+
+const handleCopyGame = (game) => {
+	// On mobile/click: show a simple prompt to pick a column
+	const colNames = state.columns.map(c => typeof c === 'object' ? c.name : c)
+	const currentCols = [game.status, ...(game.duplicateColumns || [])]
+	const available = colNames.filter(c => !currentCols.includes(c))
+	if (available.length === 0) {
+		alert('This game is already in all columns.')
+		return
+	}
+	const choice = prompt(`Copy "${game.name}" to column:\n${available.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nEnter number:`)
+	if (choice) {
+		const idx = parseInt(choice) - 1
+		if (idx >= 0 && idx < available.length) {
+			copyGameToColumn(game, available[idx])
+		}
+	}
+}
+
+const onBinDrop = (evt) => {
+	evt.preventDefault()
+	const gameId = evt.dataTransfer.getData('gameId')
+	const sourceColumn = evt.dataTransfer.getData('sourceColumn')
+	const game = state.games.find(g => g.appid.toString() === gameId)
+	if (game && sourceColumn) {
+		const cols = [game.status, ...(game.duplicateColumns || [])]
+		if (cols.length > 1) {
+			removeGameFromColumn(game, sourceColumn)
+		}
+	}
+	isDragging.value = false
+	isShiftHeld.value = false
+	draggedGameIsDuplicate.value = false
+	dragSourceColumn.value = ''
 }
 
 
@@ -287,6 +393,10 @@ const saveLayout = () => {
 		state.games.forEach(g => {
 			if (removedNames.includes(g.status)) {
 				g.status = fallback;
+			}
+			// Clean up duplicateColumns that reference removed columns
+			if (g.duplicateColumns) {
+				g.duplicateColumns = g.duplicateColumns.filter(c => !removedNames.includes(c));
 			}
 		});
 	}
@@ -390,6 +500,14 @@ const getColName = (col) => {
 				ref="boardContainerRef"
 				:class="{ 'is-dragging': touchState.active }"
 		>
+			<!-- Drag Hint -->
+			<transition name="fade">
+				<div v-if="isDragging || touchState.active" class="drag-hint">
+					<span v-if="isShiftHeld">⧉ Release to <strong>copy</strong> game into column</span>
+					<span v-else>Hold <kbd>Shift</kbd> while dragging to <strong>copy</strong> instead of move</span>
+				</div>
+			</transition>
+
 			<transition-group name="column-list" tag="div" class="board-flex">
 				<KanbanColumn
 						v-for="col in state.columns"
@@ -403,22 +521,41 @@ const getColName = (col) => {
 				>
 					<GameCard
 							v-for="game in getGamesByStatus(getColName(col))"
-							:key="game.appid"
+							:key="game.appid + '-' + getColName(col)"
 							:game="game"
 							:completion-data="getCompletionData(game)"
 							:column-color="getColColor(col)"
 							:loading-details="game.loadingDetails"
 							:draggable="true"
-							@dragstart="onDragStart($event, game)"
-							@touchstart="onTouchStart($event, game)"
+							:is-duplicate="isGameDuplicateInColumn(game, getColName(col))"
+							@dragstart="onDragStart($event, game, getColName(col))"
+							@touchstart="onTouchStart($event, game, getColName(col))"
 							@touchmove="onTouchMove($event)"
 							@touchend="onTouchEnd($event)"
 							@info="openGameInfo"
 							@hide="toggleHide"
 							@load-stats="fetchGameDetails"
+							@copy="handleCopyGame"
 					/>
 				</KanbanColumn>
 			</transition-group>
 		</div>
+
+		<!-- Bin Drop Zone for removing duplicates -->
+		<transition name="fade">
+			<div
+					v-if="(isDragging || touchState.active) && draggedGameIsDuplicate"
+					class="drag-bin"
+					@dragover.prevent
+					@dragenter.prevent
+					@drop="onBinDrop"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+					<path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+					<path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H5.5l1-1h3l1 1H13.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+				</svg>
+				<span>Remove from column</span>
+			</div>
+		</transition>
 	</div>
 </template>

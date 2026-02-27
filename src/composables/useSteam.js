@@ -337,6 +337,7 @@ const refreshLibrary = async () => {
                 achievements: existing ? existing.achievements : null,
                 achievementsList: existing ? existing.achievementsList : null,
                 hidden: existing ? existing.hidden : false,
+                duplicateColumns: existing ? (existing.duplicateColumns || []) : [],
                 loadingStats: false,
                 loadingDetails: false,
                 needsUpdate
@@ -408,10 +409,82 @@ const updateGameStatus = async (game, status) => {
     const targetGame = state.games.find(g => g.appid === game.appid);
     if (targetGame) {
         targetGame.status = status;
+        // Also clean up duplicateColumns: remove the old primary status if it appears there,
+        // and remove new status from duplicates since it's now the primary
+        if (targetGame.duplicateColumns) {
+            targetGame.duplicateColumns = targetGame.duplicateColumns.filter(c => c !== status);
+        }
         await saveGameToDB(targetGame);
     } else {
         console.error("Game not found in state", game.appid)
     }
+}
+
+/**
+ * Copy a game into an additional column (multi-column / duplicate support).
+ * The game keeps its primary `status` column and gets an entry in `duplicateColumns`.
+ * A game must always remain in at least one column (its primary status).
+ */
+const copyGameToColumn = async (game, column) => {
+    const targetGame = state.games.find(g => g.appid === game.appid);
+    if (!targetGame) return;
+
+    if (!targetGame.duplicateColumns) {
+        targetGame.duplicateColumns = [];
+    }
+
+    // Don't duplicate into primary column or if already duplicated there
+    if (targetGame.status === column) return;
+    if (targetGame.duplicateColumns.includes(column)) return;
+
+    targetGame.duplicateColumns.push(column);
+    await saveGameToDB(targetGame);
+}
+
+/**
+ * Remove a game from a specific column.
+ * If the column is the primary status, the first duplicate becomes the new primary.
+ * If it's a duplicate column, it's simply removed from duplicateColumns.
+ * A game must always remain in at least one column.
+ */
+const removeGameFromColumn = async (game, column) => {
+    const targetGame = state.games.find(g => g.appid === game.appid);
+    if (!targetGame) return;
+
+    const dupes = targetGame.duplicateColumns || [];
+    const allColumns = [targetGame.status, ...dupes];
+
+    // Must remain in at least one column
+    if (allColumns.length <= 1) return;
+
+    if (targetGame.status === column) {
+        // Promote the first duplicate to primary
+        const newPrimary = dupes[0];
+        targetGame.status = newPrimary;
+        targetGame.duplicateColumns = dupes.slice(1);
+    } else {
+        targetGame.duplicateColumns = dupes.filter(c => c !== column);
+    }
+
+    await saveGameToDB(targetGame);
+}
+
+/**
+ * Check if a game is in multiple columns (has duplicates).
+ */
+const isGameDuplicated = (game) => {
+    return game.duplicateColumns && game.duplicateColumns.length > 0;
+}
+
+/**
+ * Get all columns a game appears in (primary + duplicates).
+ */
+const getGameColumns = (game) => {
+    const cols = [game.status];
+    if (game.duplicateColumns) {
+        cols.push(...game.duplicateColumns);
+    }
+    return cols;
 }
 
 const toggleGameVisibility = async (game) => {
@@ -496,6 +569,7 @@ const importCollections = async (data, mode = 'add', onlyUnassigned = false) => 
         }
 
         // Assign every game
+        // TODO manage a game being in multiple collections - currently it will just be assigned to the last one encountered in the list
         for (const game of state.games) {
             const targetCol = gameToColumn.get(game.appid)
             if (targetCol) {
@@ -504,7 +578,6 @@ const importCollections = async (data, mode = 'add', onlyUnassigned = false) => 
                     gamesMoved++
                 }
             } else {
-                // Game not in any collection -> reset to Backlog
                 if (game.status !== 'Backlog') {
                     game.status = 'Backlog'
                     gamesReset++
@@ -567,6 +640,10 @@ export function useSteam() {
         toggleGameVisibility,
         setGameVisibility,
         setGamesVisibility,
-        importCollections
+        importCollections,
+        copyGameToColumn,
+        removeGameFromColumn,
+        isGameDuplicated,
+        getGameColumns
     }
 }
