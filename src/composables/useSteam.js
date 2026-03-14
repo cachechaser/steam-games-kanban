@@ -92,13 +92,78 @@ const clearDB = async () => {
 const state = reactive({
     steamId: '',
     apiKey: '',
+    hasServerApiKey: false,
     games: [],
     columns: ['Backlog', 'Playing', 'Completed'],
-    lastUpdated: null,
+    lastUpdated: 0,
     userProfile: null,
     loading: false,
     error: null
 })
+
+let hasLoadedServerConfig = false
+
+const hasAnyApiKey = () => Boolean((state.apiKey || '').trim() || state.hasServerApiKey)
+
+const buildSteamApiUrl = (path, params = {}) => {
+    const query = new URLSearchParams()
+
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            query.set(key, String(value))
+        }
+    })
+
+    const userApiKey = (state.apiKey || '').trim()
+    if (userApiKey) {
+        query.set('key', userApiKey)
+    }
+
+    return `/api/steam/${path}?${query.toString()}`
+}
+
+const loadServerConfig = async (force = false) => {
+    if (hasLoadedServerConfig && !force) {
+        return
+    }
+
+    try {
+        const response = await fetch('/api/steam/config')
+        if (!response.ok) {
+            state.hasServerApiKey = false
+            return
+        }
+
+        const data = await response.json()
+        state.hasServerApiKey = Boolean(data?.hasServerApiKey)
+        hasLoadedServerConfig = true
+    } catch (e) {
+        state.hasServerApiKey = false
+        console.warn('Failed to load Steam server config', e)
+    }
+}
+
+const isAuthErrorStatus = (status) => status === 401 || status === 403
+
+const disableInvalidUserApiKey = (context = 'Steam API', apiErrorMessage = '') => {
+    const userApiKey = (state.apiKey || '').trim()
+    if (!userApiKey) {
+        return false
+    }
+
+    state.apiKey = ''
+    saveMetadata()
+
+    if (state.hasServerApiKey) {
+        const base = apiErrorMessage || `Access Denied while fetching ${context}.`
+        state.error = `${base} Your user API key override was ignored and the server API key is now used.`
+        console.warn(`User API key override rejected for ${context}. Falling back to server API key.`)
+    } else {
+        state.error = apiErrorMessage || `Your API key was rejected for ${context}. Please enter a valid Steam Web API key.`
+    }
+
+    return true
+}
 
 // Error Handling Helper
 const handleApiError = (response, context) => {
@@ -116,6 +181,8 @@ const handleApiError = (response, context) => {
 
 // Persistence
 const loadState = async () => {
+    await loadServerConfig()
+
     const saved = localStorage.getItem(STATE_KEY)
     if (saved) {
         try {
@@ -123,7 +190,7 @@ const loadState = async () => {
             state.steamId = parsed.steamId || ''
             state.apiKey = parsed.apiKey || ''
             state.columns = parsed.columns || ['Backlog', 'Playing', 'Completed']
-            state.lastUpdated = parsed.lastUpdated || null
+            state.lastUpdated = parsed.lastUpdated || 0
             state.userProfile = parsed.userProfile || null
         } catch (e) {
             console.error('Failed to load state', e)
@@ -175,12 +242,18 @@ const getCompletionData = (game) => {
 
 // Logic
 const fetchUserProfile = async () => {
-    if (!state.steamId || !state.apiKey) return
+    if (!state.steamId || !hasAnyApiKey()) return
 
     try {
-        const response = await fetch(`/api/steam/ISteamUser/GetPlayerSummaries/v0002/?key=${state.apiKey}&steamids=${state.steamId}`)
+        const response = await fetch(buildSteamApiUrl('ISteamUser/GetPlayerSummaries/v0002/', {
+            steamids: state.steamId
+        }))
         if (!response.ok) {
-            console.warn(handleApiError(response, 'User Profile'))
+            const apiErrorMessage = handleApiError(response, 'User Profile')
+            if (isAuthErrorStatus(response.status)) {
+                disableInvalidUserApiKey('User Profile', apiErrorMessage)
+            }
+            console.warn(apiErrorMessage)
             return
         }
 
@@ -207,11 +280,27 @@ const fetchGameDetails = async (game, force = false) => {
     game.loadingDetails = true
 
     try {
-        const p1 = fetch(`/api/steam/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${game.appid}&key=${state.apiKey}&steamid=${state.steamId}&l=english`)
-        const p2 = fetch(`/api/steam/ISteamUserStats/GetSchemaForGame/v2/?key=${state.apiKey}&appid=${game.appid}&l=english`)
+        const p1 = fetch(buildSteamApiUrl('ISteamUserStats/GetPlayerAchievements/v0001/', {
+            appid: game.appid,
+            steamid: state.steamId,
+            l: 'english'
+        }))
+        const p2 = fetch(buildSteamApiUrl('ISteamUserStats/GetSchemaForGame/v2/', {
+            appid: game.appid,
+            l: 'english'
+        }))
         const p3 = fetch(`/api/steam/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${game.appid}&format=json`)
 
         const [r1, r2, r3] = await Promise.all([p1, p2, p3])
+
+        if (isAuthErrorStatus(r1.status) || isAuthErrorStatus(r2.status)) {
+            const authStatus = isAuthErrorStatus(r1.status) ? r1.status : r2.status
+            disableInvalidUserApiKey(`Achievements for ${game.name}`, handleApiError({status: authStatus}, `Achievements for ${game.name}`))
+            game.achievementsList = {error: 'Steam API access denied.'}
+            game.needsUpdate = true
+            await saveGameToDB(game)
+            return
+        }
 
         if (r1.status === 429 || r2.status === 429 || r3.status === 429) {
             throw new Error("Rate Limit Exceeded")
@@ -277,24 +366,42 @@ const fetchGameDetails = async (game, force = false) => {
  * 3. Fetches detailed achievements only for those games
  * 4. Updates lastUpdated timestamp
  */
-const refreshLibrary = async () => {
+const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMessage = false) => {
     if (state.loading) return
 
-    if (!state.steamId || !state.apiKey) {
-        state.error = 'Please set your Steam ID and API Key in Profile settings.'
+    await loadServerConfig()
+
+    if (!state.steamId || !hasAnyApiKey()) {
+        state.error = 'Please connect your Steam ID and configure an API key (server default or user override) in Profile settings.'
         return
     }
 
     state.loading = true
-    state.error = null
+    if (!preserveErrorMessage) {
+        state.error = null
+    }
 
     await fetchUserProfile()
 
     try {
-        const response = await fetch(`/api/steam/IPlayerService/GetOwnedGames/v0001/?key=${state.apiKey}&steamid=${state.steamId}&format=json&include_appinfo=1&include_played_free_games=1`)
+        const response = await fetch(buildSteamApiUrl('IPlayerService/GetOwnedGames/v0001/', {
+            steamid: state.steamId,
+            format: 'json',
+            include_appinfo: 1,
+            include_played_free_games: 1
+        }))
 
         if (!response.ok) {
-            state.error = handleApiError(response, 'Game List')
+            const apiErrorMessage = handleApiError(response, 'Game List')
+            if (isAuthErrorStatus(response.status)) {
+                const disabled = disableInvalidUserApiKey('Game List', apiErrorMessage)
+                if (disabled && state.hasServerApiKey && allowUserKeyFallbackRetry) {
+                    state.loading = false
+                    await refreshLibrary(false, true)
+                    return
+                }
+            }
+            state.error = apiErrorMessage
             return
         }
 
@@ -459,8 +566,7 @@ const removeGameFromColumn = async (game, column) => {
 
     if (targetGame.status === column) {
         // Promote the first duplicate to primary
-        const newPrimary = dupes[0];
-        targetGame.status = newPrimary;
+        targetGame.status = dupes[0];
         targetGame.duplicateColumns = dupes.slice(1);
     } else {
         targetGame.duplicateColumns = dupes.filter(c => c !== column);

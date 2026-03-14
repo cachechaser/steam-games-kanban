@@ -10,7 +10,7 @@ defineProps({
 			<h1>{{ title }}</h1>
 			<slot name="after-title"/>
 		</div>
-		<slot name="actions"/>
-	</div>
+		<slot name="actions"></slot>
+	</div> 
 </template>
 

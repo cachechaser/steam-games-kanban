@@ -20,7 +20,6 @@ const completionColumns = [
 ]
 
 
-
 // Helper to calculate percentage from the detailed list if available, or fallback to simple stats
 const getCompletionData = (game) => {
 	// If detailed list exists
@@ -94,9 +93,15 @@ const processedColumns = computed(() => {
 
 		<ViewHeader title="Completion Board">
 			<template #actions>
-				<button @click="refreshLibrary" :disabled="state.loading" class="btn btn-secondary reload-btn">
-					{{ state.loading ? 'Updating Stats...' : '↻ Refresh Stats' }}
-				</button>
+				<div class="actions">
+					<button @click="refreshLibrary" :disabled="state.loading" class="btn btn-secondary reload-btn">
+						<template v-if="state.loading">Updating Stats...</template>
+						<template v-else>
+							<font-awesome-icon icon="rotate"/>
+							<span>Refresh Stats</span>
+						</template>
+					</button>
+				</div>
 			</template>
 		</ViewHeader>
 

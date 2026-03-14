@@ -1,15 +1,20 @@
 <script setup>
-import {computed} from 'vue'
 import {useSteam} from '../composables/useSteam'
 import {useSteamLogin} from '../composables/useSteamLogin'
 import {useRouter} from '../router'
+import {useDataSync} from '../composables/useDataSync'
 
-const {currentView} = useRouter()
+const {currentView, navigate} = useRouter()
 const {state} = useSteam()
 const {loginWithSteam} = useSteamLogin()
+const {openOverlay, isOverlayOpen} = useDataSync()
 
 const isActive = (viewName) => {
 	return currentView.value === viewName
+}
+
+const handleSyncClick = () => {
+	openOverlay()
 }
 </script>
 
@@ -17,22 +22,41 @@ const isActive = (viewName) => {
 	<nav class="navbar">
 		<div class="container">
 			<div class="left-section">
-				<a href="#/" class="logo">Steam Backlog</a>
+				<button type="button" class="logo" @click="navigate('/')">Steam Backlog</button>
 				<div class="links" v-if="state.steamId">
-					<a href="#/" :class="{ active: isActive('Board') }">Board</a>
-					<a href="#/achievements" :class="{ active: isActive('Achievements') }">Achievements</a>
-					<a href="#/completion" :class="{ active: isActive('Completion') }">Completion</a>
+					<button type="button" class="nav-link" :class="{ active: isActive('Board') }" @click="navigate('/')">
+						<font-awesome-icon icon="table-columns" class="nav-icon" />
+						<span class="nav-text">Board</span>
+					</button>
+					<button type="button" class="nav-link" :class="{ active: isActive('Achievements') }" @click="navigate('/achievements')">
+						<font-awesome-icon icon="trophy" class="nav-icon" />
+						<span class="nav-text">Achievements</span>
+					</button>
+					<button type="button" class="nav-link" :class="{ active: isActive('Completion') }" @click="navigate('/completion')">
+						<font-awesome-icon icon="chart-bar" class="nav-icon" />
+						<span class="nav-text">Completion</span>
+					</button>
 				</div>
 			</div>
 
 			<div class="right-section">
-				<a v-if="state.steamId && state.userProfile" href="#/profile" class="user-profile-link"
-				   :class="{ active: isActive('Profile') || isActive('ProfileEdit') }">
+				<button
+					v-if="state.steamId"
+					class="btn btn-secondary btn-icon"
+					:class="{ active: isOverlayOpen }"
+					@click="handleSyncClick"
+					title="Sync with another device"
+				>
+					<font-awesome-icon icon="satellite-dish" />
+				</button>
+
+				<button v-if="state.steamId && state.userProfile" type="button" class="user-profile-link"
+				   :class="{ active: isActive('Profile') || isActive('ProfileEdit') }" @click="navigate('/profile')">
 					<div class="user-profile">
 						<span class="username">{{ state.userProfile.personaname }}</span>
 						<img :src="state.userProfile.avatar" alt="Avatar" class="avatar"/>
 					</div>
-				</a>
+				</button>
 
 				<div v-else-if="state.steamId && !state.userProfile" class="user-profile-link">
 					<span class="username">{{ state.steamId }}</span>
@@ -44,10 +68,16 @@ const isActive = (viewName) => {
 				</button>
 
 				<div v-else class="setup-msg">
-					<a v-if="!state.apiKey" href="#/profile/edit" class="setup-link" :class="{ active: isActive('ProfileEdit') }">
+					<button
+						v-if="!state.apiKey && !state.hasServerApiKey"
+						type="button"
+						class="setup-link"
+						:class="{ active: isActive('ProfileEdit') }"
+						@click="navigate('/profile/edit')"
+					>
 						<span class="desktop-text">Complete Setup</span>
 						<span class="mobile-text">Setup</span>
-					</a>
+					</button>
 				</div>
 			</div>
 		</div>
@@ -95,10 +125,13 @@ const isActive = (viewName) => {
 	font-size: 1.5rem;
 	font-weight: 900;
 	letter-spacing: 1px;
+	background-color: transparent;
 	background: linear-gradient(135deg, var(--steam-blue-light) 0%, #ffffff 100%);
+	border: none;
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
 	text-decoration: none;
+	cursor: pointer;
 	transition: opacity 0.3s;
 	text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 	white-space: nowrap;
@@ -114,8 +147,11 @@ const isActive = (viewName) => {
 	gap: 15px;
 }
 
-.links a {
+.nav-link {
 	color: var(--steam-text-muted);
+	background: transparent;
+	border: none;
+	cursor: pointer;
 	text-decoration: none;
 	font-weight: 500;
 	padding: 8px 12px;
@@ -123,38 +159,50 @@ const isActive = (viewName) => {
 	transition: all 0.3s ease;
 	position: relative;
 	overflow: hidden;
+	display: flex;
+	align-items: center;
+	gap: 6px;
 }
 
-.links a::before {
+.nav-icon {
+	font-size: 0.9rem;
+	flex-shrink: 0;
+}
+
+.nav-text {
+	white-space: nowrap;
+}
+
+.nav-link::before {
 	content: '';
 	position: absolute;
 	bottom: 0;
 	left: 0;
-	width: 0%;
+	width: 0;
 	height: 2px;
 	background: var(--steam-blue-light);
 	transition: width 0.3s;
 }
 
-.links a:hover::before {
+.nav-link:hover::before {
 	width: 100%;
 }
 
-.links a:hover {
+.nav-link:hover {
 	color: white;
 	background: rgba(102, 192, 244, 0.15);
 	transform: translateY(-2px);
 	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.links a.active {
+.nav-link.active {
 	color: var(--steam-blue-light);
 	background: rgba(102, 192, 244, 0.15);
 	font-weight: bold;
 	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.links a.active::before {
+.nav-link.active::before {
 	width: 100%;
 }
 
@@ -172,6 +220,10 @@ const isActive = (viewName) => {
 }
 
 .user-profile-link {
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	padding: 0;
 	text-decoration: none;
 	border-radius: 30px;
 	transition: all 0.3s ease;
@@ -219,13 +271,14 @@ const isActive = (viewName) => {
 
 .setup-link {
 	color: #ff9900;
+	background: rgba(255, 153, 0, 0.1);
+	border: 1px solid #ff9900;
+	cursor: pointer;
 	font-weight: bold;
 	text-decoration: none;
 	padding: 6px 12px;
-	border: 1px solid #ff9900;
 	border-radius: 4px;
 	transition: all 0.3s;
-	background: rgba(255, 153, 0, 0.1);
 	font-size: 0.9em;
 	display: inline-block;
 }
@@ -268,9 +321,17 @@ const isActive = (viewName) => {
 		gap: 5px;
 	}
 
-	.links a {
+	.nav-link {
 		padding: 5px 8px;
 		font-size: 0.9em;
+	}
+
+	.nav-text {
+		display: none;
+	}
+
+	.nav-icon {
+		font-size: 1.1rem;
 	}
 
 	.username {

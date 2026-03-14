@@ -2,6 +2,7 @@
 import {computed, onMounted, ref} from 'vue'
 import {useRouter} from './router'
 import {useSteam} from './composables/useSteam'
+import {useDataSync} from './composables/useDataSync'
 import NavBar from './components/NavBar.vue'
 import Footer from './components/Footer.vue'
 import BoardView from './components/views/BoardView.vue'
@@ -10,9 +11,11 @@ import ProfileEditView from './components/views/ProfileEditView.vue'
 import CompletionView from './components/views/CompletionView.vue'
 import AchievementView from './components/views/AchievementView.vue'
 import HomeView from './components/views/HomeView.vue'
+import DataSyncOverlay from './components/DataSyncOverlay.vue'
 
 const {currentView, navigate} = useRouter()
 const {state, loadState, refreshLibrary} = useSteam()
+const {isOverlayOpen, closeOverlay, joinRoom} = useDataSync()
 const isInitialized = ref(false)
 
 const currentComponent = computed(() => {
@@ -58,8 +61,8 @@ const checkOpenIdReturn = async () => {
 			localStorage.setItem('steam_kanban_state', JSON.stringify({...state, steamId: id}))
 			navigate('#/profile/edit');
 			window.history.replaceState({}, document.title, window.location.pathname + '#/profile/edit');
-			if (state.apiKey) {
-				await refreshLibrary();
+			if (state.apiKey || state.hasServerApiKey) {
+				void refreshLibrary();
 			}
 			return true;
 		}
@@ -67,9 +70,24 @@ const checkOpenIdReturn = async () => {
 	return false;
 }
 
+const checkSyncParam = () => {
+	const params = new URLSearchParams(window.location.search)
+	const syncRoom = params.get('sync')
+	if (syncRoom) {
+		window.history.replaceState({}, document.title, window.location.pathname + window.location.hash)
+		isOverlayOpen.value = true
+		joinRoom(syncRoom)
+		return true
+	}
+	return false
+}
+
 onMounted(async () => {
 	await loadState()
-	await checkOpenIdReturn()
+	const isSyncing = checkSyncParam()
+	if (!isSyncing) {
+		await checkOpenIdReturn()
+	}
 	isInitialized.value = true
 })
 </script>
@@ -78,6 +96,9 @@ onMounted(async () => {
 	<div class="app-container">
 		<NavBar/>
 		<main class="main-content">
+			<!--Global Overlays-->
+			<DataSyncOverlay v-if="isOverlayOpen" @close="closeOverlay"/>
+
 			<div class="content-wrapper">
 				<transition name="fade" mode="out-in">
 					<component :is="currentComponent" v-if="currentComponent"/>

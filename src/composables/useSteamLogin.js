@@ -4,8 +4,10 @@
  */
 export function useSteamLogin() {
 	const loginWithSteam = (returnHash = '') => {
+		// Vue click handlers pass PointerEvent when no args are supplied.
+		const normalizedReturnHash = typeof returnHash === 'string' ? returnHash : ''
 		const baseUrl = window.location.href.split('#')[0]
-		const returnUrl = returnHash ? baseUrl + returnHash : baseUrl
+		const returnUrl = normalizedReturnHash ? baseUrl + normalizedReturnHash : baseUrl
 		const realm = window.location.origin
 
 		const params = new URLSearchParams({

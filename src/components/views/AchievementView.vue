@@ -2,6 +2,7 @@
 import {ref, computed, watch} from 'vue'
 import GameInfoComponent from '../GameInfoComponent.vue'
 import AchievementTable from '../AchievementTable.vue'
+import MultiSelectDropdown from '../ui/MultiSelectDropdown.vue'
 import ViewHeader from "@/components/ui/ViewHeader.vue";
 import {useGameInfoModal} from "@/composables/useGameInfoModal.js";
 import {useStatsAutoLoad} from "@/composables/useStatsAutoLoad.js";
@@ -37,16 +38,6 @@ const allTableColumns = [
 ]
 const visibleColumns = ref(allTableColumns.filter(c => c.default).map(c => c.key))
 
-const toggleVisibleColumn = (key) => {
-	const col = allTableColumns.find(c => c.key === key)
-	if (col?.locked) return
-	const idx = visibleColumns.value.indexOf(key)
-	if (idx > -1) {
-		visibleColumns.value.splice(idx, 1)
-	} else {
-		visibleColumns.value.push(key)
-	}
-}
 
 // Rarity tier helper
 const getRarityTier = (pct) => {
@@ -229,14 +220,6 @@ const goToPage = (page) => {
 	}
 }
 
-const toggleColumn = (col) => {
-	const idx = filterColumns.value.indexOf(col)
-	if (idx > -1) {
-		filterColumns.value.splice(idx, 1)
-	} else {
-		filterColumns.value.push(col)
-	}
-}
 
 const clearFilters = () => {
 	filterLocked.value = 'all'
@@ -274,29 +257,33 @@ watch([filterLocked, filterPlayedOnly, filterColumns, gameSearch, rarityMin, rar
 				<span class="results-count">{{ pageInfo.total }} Total</span>
 			</template>
 			<template #actions>
-				<span v-if="state.loading" class="loading-text">Checking for updates...</span>
-				<button
-						@click="showFilters = !showFilters"
-						class="btn btn-secondary"
-						:class="{ active: showFilters }"
-				>
-					<span v-if="showFilters">▼</span><span v-else>►</span>
-					Filters
-					<span v-if="activeFilterCount > 0" class="filter-badge">{{ activeFilterCount }}</span>
-				</button>
-				<button
-						@click="refreshLibrary"
-						:disabled="state.loading"
-						class="btn btn-secondary reload-btn"
-				>
-					↻ Refresh Library
-				</button>
+				<div class="actions">
+					<span v-if="state.loading" class="loading-text">Checking for updates...</span>
+					<button
+							@click="showFilters = !showFilters"
+							class="btn btn-secondary"
+							:class="{ active: showFilters }"
+					>
+						<font-awesome-icon :icon="showFilters ? 'chevron-down' : 'chevron-right'"/>
+						<span>Filters</span>
+						<span v-if="activeFilterCount > 0" class="filter-badge">{{ activeFilterCount }}</span>
+					</button>
+					<button
+							@click="refreshLibrary"
+							:disabled="state.loading"
+							class="btn btn-secondary reload-btn"
+					>
+						<font-awesome-icon icon="rotate"/>
+						<span>Refresh Library</span>
+					</button>
+				</div>
 			</template>
 		</ViewHeader>
 
 		<!-- Error Banner -->
 		<div v-if="state.error" class="error-banner">
-			⚠️ {{ state.error }}
+			<font-awesome-icon icon="triangle-exclamation"/>
+			{{ state.error }}
 		</div>
 
 		<!-- Filter Panel (collapsible) -->
@@ -329,18 +316,27 @@ watch([filterLocked, filterPlayedOnly, filterColumns, gameSearch, rarityMin, rar
 						</label>
 					</div>
 
-					<div class="filter-group">
+					<div class="filter-group filter-group-big">
 						<label>Board Columns</label>
-						<div class="column-tags">
-							<span
-									v-for="col in availableColumns"
-									:key="col"
-									@click="toggleColumn(col)"
-									:class="['col-tag', filterColumns.includes(col) ? 'active' : '']"
-							>
-								{{ col }}
-							</span>
-						</div>
+						<MultiSelectDropdown
+								:options="availableColumns"
+								v-model="filterColumns"
+								:mode="'dropdown'"
+								button-label="Filter by Column"
+								:show-tags="true"
+						/>
+					</div>
+
+					<div class="filter-group filter-group-big">
+						<label>Table Columns</label>
+						<MultiSelectDropdown
+								:options="allTableColumns"
+								v-model="visibleColumns"
+								:mode="'dropdown'"
+								button-label="Manage Columns"
+								:min-selected="1"
+								:show-tags="true"
+						/>
 					</div>
 
 					<div class="filter-group filter-group-wide">
@@ -348,20 +344,6 @@ watch([filterLocked, filterPlayedOnly, filterColumns, gameSearch, rarityMin, rar
 						<div class="range-slider-group">
 							<input type="range" v-model.number="rarityMin" min="0" max="100" class="slider"/>
 							<input type="range" v-model.number="rarityMax" min="0" max="100" class="slider"/>
-						</div>
-					</div>
-
-					<div class="filter-group filter-group-wide">
-						<label>Table Columns</label>
-						<div class="column-tags">
-							<span
-									v-for="col in allTableColumns"
-									:key="col.key"
-									@click="toggleVisibleColumn(col.key)"
-									:class="['col-tag', visibleColumns.includes(col.key) ? 'active' : '', col.locked ? 'locked' : '']"
-							>
-								{{ col.label }}
-							</span>
 						</div>
 					</div>
 
@@ -395,7 +377,7 @@ watch([filterLocked, filterPlayedOnly, filterColumns, gameSearch, rarityMin, rar
 				<button
 						@click="goToPage(currentPage - 1)"
 						:disabled="currentPage === 1"
-						class="btn-page"
+						class="btn btn-secondary btn-page"
 				>
 					Prev
 				</button>
@@ -403,7 +385,7 @@ watch([filterLocked, filterPlayedOnly, filterColumns, gameSearch, rarityMin, rar
 				<button
 						@click="goToPage(currentPage + 1)"
 						:disabled="currentPage === totalPages"
-						class="btn-page"
+						class="btn btn-secondary btn-page"
 				>
 					Next
 				</button>

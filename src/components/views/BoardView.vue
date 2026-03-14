@@ -5,6 +5,7 @@ import {useGameInfoModal} from '@/composables/useGameInfoModal.js'
 import GameInfoComponent from '../GameInfoComponent.vue'
 import GameCard from '../ui/GameCard.vue'
 import KanbanColumn from '../ui/KanbanColumn.vue'
+import BaseOverlay from '../ui/BaseOverlay.vue'
 import ViewHeader from "@/components/ui/ViewHeader.vue";
 
 const {state, refreshLibrary, fetchGameDetails, getCompletionData, updateGameStatus, toggleGameVisibility, copyGameToColumn, removeGameFromColumn} = useStatsAutoLoad()
@@ -437,13 +438,19 @@ const getColName = (col) => {
 				</div>
 				<div class="actions">
 					<button @click="showFilters = !showFilters" class="btn btn-secondary" :class="{ active: showFilters }">
-						<span v-if="showFilters">▼</span><span v-else>►</span> Filters
+						<font-awesome-icon :icon="showFilters ? 'chevron-down' : 'chevron-right'" /> 
+						<span>Filters</span>
 					</button>
 					<button @click="openLayoutEditor" class="btn btn-secondary layout-btn">
-						✎ Edit Board
+						<font-awesome-icon icon="pen" /> 
+						<span>Edit Board</span>
 					</button>
 					<button @click="refreshLibrary" :disabled="state.loading" class="btn btn-secondary reload-stats-btn">
-						{{ state.loading ? 'Syncing...' : '↻ Sync Library' }}
+						<template v-if="state.loading">Syncing...</template>
+						<template v-else>
+							<font-awesome-icon icon="rotate" /> 
+							<span>Sync Library</span>
+						</template>
 					</button>
 				</div>
 			</template>
@@ -464,36 +471,34 @@ const getColName = (col) => {
 		</div>
 
 		<!-- Layout Editor Modal -->
-		<div v-if="showLayoutEditor" class="modal-overlay">
-			<div class="modal-content">
-				<h2>Edit Board Layout</h2>
-				<div class="editor-list">
-					<div v-for="(col, index) in editingColumns" :key="col.id || index" class="editor-row">
-						<div class="row-controls">
-							<button @click="moveColumn(index, -1)" :disabled="index === 0" class="btn btn-small">▲</button>
-							<button @click="moveColumn(index, 1)" :disabled="index === editingColumns.length - 1" class="btn btn-small">▼</button>
-						</div>
-						<input v-model="col.name" placeholder="Name" class="input-field name-input"/>
-						<div class="color-picker">
-							<div
-									v-for="color in availableColors"
-									:key="color"
-									class="color-swatch"
-									:style="{ background: color }"
-									:class="{ selected: col.color === color }"
-									@click="col.color = color"
-							></div>
-						</div>
-						<button @click="removeEditColumn(index)" class="btn btn-icon remove-btn">×</button>
+		<BaseOverlay :show="showLayoutEditor" @close="showLayoutEditor = false">
+			<h2>Edit Board Layout</h2>
+			<div class="editor-list">
+				<div v-for="(col, index) in editingColumns" :key="col.id || index" class="editor-row">
+					<div class="row-controls">
+						<button @click="moveColumn(index, -1)" :disabled="index === 0" class="btn btn-secondary btn-icon"><font-awesome-icon icon="chevron-up" /></button>
+						<button @click="moveColumn(index, 1)" :disabled="index === editingColumns.length - 1" class="btn btn-secondary btn-icon"><font-awesome-icon icon="chevron-down" /></button>
 					</div>
-				</div>
-				<button @click="addEditColumn" class="btn btn-secondary add-btn-full">+ Add Column</button>
-				<div class="modal-actions">
-					<button @click="showLayoutEditor = false" class="btn btn-secondary">Cancel</button>
-					<button @click="saveLayout" class="btn btn-primary">Save Changes</button>
+					<input v-model="col.name" placeholder="Name" class="input-field name-input"/>
+					<div class="color-picker">
+						<div
+								v-for="color in availableColors"
+								:key="color"
+								class="color-swatch"
+								:style="{ background: color }"
+								:class="{ selected: col.color === color }"
+								@click="col.color = color"
+						></div>
+					</div>
+					<button @click="removeEditColumn(index)" class="btn btn-secondary btn-icon remove-btn"><font-awesome-icon icon="xmark" /></button>
 				</div>
 			</div>
-		</div>
+			<button @click="addEditColumn" class="btn btn-secondary add-btn-full">+ Add Column</button>
+			<template #actions>
+				<button @click="showLayoutEditor = false" class="btn btn-secondary">Cancel</button>
+				<button @click="saveLayout" class="btn btn-primary">Save Changes</button>
+			</template>
+		</BaseOverlay>
 
 		<div
 				class="board-container"
@@ -503,7 +508,7 @@ const getColName = (col) => {
 			<!-- Drag Hint -->
 			<transition name="fade">
 				<div v-if="isDragging || touchState.active" class="drag-hint">
-					<span v-if="isShiftHeld">⧉ Release to <strong>copy</strong> game into column</span>
+					<span v-if="isShiftHeld"><font-awesome-icon icon="copy" /> Release to <strong>copy</strong> game into column</span>
 					<span v-else>Hold <kbd>Shift</kbd> while dragging to <strong>copy</strong> instead of move</span>
 				</div>
 			</transition>
@@ -550,10 +555,7 @@ const getColName = (col) => {
 					@dragenter.prevent
 					@drop="onBinDrop"
 			>
-				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
-					<path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-					<path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H5.5l1-1h3l1 1H13.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-				</svg>
+				<font-awesome-icon icon="trash-can" />
 				<span>Remove from column</span>
 			</div>
 		</transition>

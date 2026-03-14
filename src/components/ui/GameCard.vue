@@ -34,10 +34,10 @@ const completionWidth = () => {
 <template>
 	<div class="card-panel card-hover card" :draggable="draggable" :class="{ 'is-duplicate': isDuplicate }">
 		<div class="card-actions-top">
-			<button @click.stop="emit('info', game)" class="hide-btn" title="Show Game Info">
+			<button @click.stop="emit('info', game)" class="btn btn-icon hide-btn" title="Show Game Info">
 				<InfoIcon/>
 			</button>
-			<button @click.stop="emit('hide', game)" class="hide-btn" title="Hide Game">
+			<button @click.stop="emit('hide', game)" class="btn btn-icon hide-btn" title="Hide Game">
 				<HideIcon/>
 			</button>
 		</div>
@@ -49,7 +49,7 @@ const completionWidth = () => {
 						alt="icon"
 						class="game-icon"
 				/>
-				<span v-if="isDuplicate" class="duplicate-badge" title="This game appears in multiple columns">⧉</span>
+				<span v-if="isDuplicate" class="duplicate-badge" title="This game appears in multiple columns"><font-awesome-icon icon="copy" /></span>
 			</div>
 			<span class="game-title">{{ game.name }}</span>
 		</div>

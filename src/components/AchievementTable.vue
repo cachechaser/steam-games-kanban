@@ -74,35 +74,35 @@ const formatPlaytime = (minutes) => {
 			<tr>
 				<th v-if="showGameColumn && isVisible('game')" @click="handleSort('gameName')" :class="['game-cell', {sorted: sortBy === 'gameName'}]">
 					Game
-					<span class="sort-icon">{{ sortBy === 'gameName' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+					<span v-if="sortBy === 'gameName'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
 				</th>
 				<th v-if="isVisible('achievement')" @click="handleSort('achName')" :class="{sorted: sortBy === 'achName'}">
 					Achievement
-					<span class="sort-icon">{{ sortBy === 'achName' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+					<span v-if="sortBy === 'achName'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
 				</th>
 				<th v-if="isVisible('rarityTier')" @click="handleSort('rarityTier')" :class="['text-center', {sorted: sortBy === 'rarityTier'}]">
 					Rarity
-					<span class="sort-icon">{{ sortBy === 'rarityTier' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+					<span v-if="sortBy === 'rarityTier'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
 				</th>
 				<th v-if="isVisible('unlockRate')" @click="handleSort('unlockRate')" :class="{sorted: sortBy === 'unlockRate'}" class="text-right">
 					Global %
-					<span class="sort-icon">{{ sortBy === 'unlockRate' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+					<span v-if="sortBy === 'unlockRate'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
 				</th>
 				<th v-if="isVisible('avgGlobalRarity')" @click="handleSort('avgGlobalRarity')" :class="['text-right', {sorted: sortBy === 'avgGlobalRarity'}]">
 					Avg. Global Rarity
-					<span class="sort-icon">{{ sortBy === 'avgGlobalRarity' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+					<span v-if="sortBy === 'avgGlobalRarity'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
 				</th>
 				<th v-if="isVisible('gameCompletion')" @click="handleSort('gameCompletion')" :class="['text-right', {sorted: sortBy === 'gameCompletion'}]">
 					Game Completion
-					<span class="sort-icon">{{ sortBy === 'gameCompletion' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+					<span v-if="sortBy === 'gameCompletion'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
 				</th>
 				<th v-if="isVisible('playtime')" @click="handleSort('playtime')" :class="['text-right', {sorted: sortBy === 'playtime'}]">
 					Playtime
-					<span class="sort-icon">{{ sortBy === 'playtime' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+					<span v-if="sortBy === 'playtime'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
 				</th>
 				<th v-if="isVisible('unlockDate')" @click="handleSort('unlockDate')" :class="{sorted: sortBy === 'unlockDate'}" class="text-right">
 					Unlock Date
-					<span class="sort-icon">{{ sortBy === 'unlockDate' ? (sortDesc ? '▼' : '▲') : '' }}</span>
+					<span v-if="sortBy === 'unlockDate'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
 				</th>
 			</tr>
 			</thead>
@@ -159,8 +159,8 @@ const formatPlaytime = (minutes) => {
                     <span v-if="ach.achieved && (ach.unlockTime || ach.unlocktime)" class="unlock-date">
                         {{ new Date((ach.unlockTime || ach.unlocktime) * 1000).toLocaleDateString() }}
                     </span>
-					<span v-else-if="ach.achieved" class="status-text unlocked">✓</span>
-					<span v-else class="status-text locked">🔒</span>
+					<span v-else-if="ach.achieved" class="status-text unlocked"><font-awesome-icon icon="check" /></span>
+					<span v-else class="status-text locked"><font-awesome-icon icon="lock" /></span>
 				</td>
 			</tr>
 			</tbody>

@@ -3,6 +3,8 @@ import {computed, ref} from 'vue'
 import {useSteam} from '../composables/useSteam'
 import AchievementTable from './AchievementTable.vue'
 import GameIconImg from './ui/GameIconImg.vue'
+import MultiSelectDropdown from './ui/MultiSelectDropdown.vue'
+import BaseOverlay from './ui/BaseOverlay.vue'
 
 const props = defineProps({
 	game: Object,
@@ -11,11 +13,10 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const {getCompletionData, updateGameStatus, state, copyGameToColumn, removeGameFromColumn, getGameColumns} = useSteam()
+const {getCompletionData, state, copyGameToColumn, removeGameFromColumn, getGameColumns} = useSteam()
 
 const sortBy = ref('unlockRate')
 const sortDesc = ref(true)
-const dropdownOpen = ref(false)
 
 const handleSort = (field) => {
 	if (sortBy.value === field) {
@@ -51,20 +52,21 @@ const gameColumns = computed(() => {
 	return getGameColumns(props.game)
 })
 
-const toggleColumn = (col) => {
+const updateGameColumns = (newColumns) => {
 	if (!props.game) return
-	if (gameColumns.value.includes(col)) {
-		if (gameColumns.value.length <= 1) return
-		removeGameFromColumn(props.game, col)
-	} else {
-		copyGameToColumn(props.game, col)
+	const current = gameColumns.value
+	// Add new columns
+	for (const col of newColumns) {
+		if (!current.includes(col)) {
+			copyGameToColumn(props.game, col)
+		}
 	}
-}
-
-const handleRemoveColumnTag = (col) => {
-	if (!props.game) return
-	if (gameColumns.value.length <= 1) return
-	removeGameFromColumn(props.game, col)
+	// Remove unchecked columns
+	for (const col of current) {
+		if (!newColumns.includes(col)) {
+			removeGameFromColumn(props.game, col)
+		}
+	}
 }
 
 const sortedAchievements = computed(() => {
@@ -106,117 +108,76 @@ const close = () => {
 </script>
 
 <template>
-	<transition name="fade">
-		<div v-if="isOpen && game" class="modal-overlay" @click.self="close">
-			<div class="modal-content game-info-modal">
-				<button class="close-btn-abs" @click="close">×</button>
-
-				<!-- Header -->
-				<div class="modal-header-custom">
-					<GameIconImg
-							:appid="game.appid"
-							:icon-hash="game.img_icon_url"
-							size="large"
-							class="game-icon-large"
-					/>
-					<div class="header-text">
-						<h2>{{ game.name }}</h2>
-						<div class="badges">
-							<!-- Checkbox dropdown -->
-							<div class="checkbox-dropdown" v-click-outside="() => dropdownOpen = false">
-								<button class="btn btn-secondary btn-sm" @click="dropdownOpen = !dropdownOpen">
-									⊞ Manage Columns ▾
-								</button>
-								<div v-if="dropdownOpen" class="dropdown-menu">
-									<label
-											v-for="col in allColumnNames"
-											:key="col"
-											class="dropdown-item"
-											:class="{ disabled: gameColumns.includes(col) && gameColumns.length <= 1 }"
-									>
-										<input
-												type="checkbox"
-												:checked="gameColumns.includes(col)"
-												:disabled="gameColumns.includes(col) && gameColumns.length <= 1"
-												@change="toggleColumn(col)"
-										/>
-										{{ col }}
-									</label>
-								</div>
-							</div>
-							<span class="playtime-badge">🕒 {{ (game.playtime_forever / 60).toFixed(1) }}h</span>
-						</div>
+	<BaseOverlay :show="isOpen && !!game" max-width="900px" :padded="false" @close="close">
+		<!-- Header -->
+		<template #header>
+			<div class="modal-header-custom">
+				<GameIconImg
+						:appid="game.appid"
+						:icon-hash="game.img_icon_url"
+						size="large"
+						class="game-icon-large"
+				/>
+				<div class="header-text">
+					<h2>{{ game.name }}</h2>
+					<div class="badges">
+						<!-- Checkbox dropdown -->
+						<MultiSelectDropdown
+								mode="dropdown"
+								:show-tags="false"
+								:options="allColumnNames"
+								:model-value="gameColumns"
+								@update:model-value="updateGameColumns"
+								button-label="Manage Columns"
+								button-icon="grip-vertical"
+								:min-selected="1"
+						/>
+						<span class="playtime-badge"><font-awesome-icon icon="clock" /> {{ (game.playtime_forever / 60).toFixed(1) }}h</span>
 					</div>
-				</div>
-
-				<!-- Stats Grid -->
-				<div class="stats-grid">
-					<div class="stat-box">
-						<span class="stat-val">{{ stats.achieved }} / {{ stats.total }}</span>
-						<span class="stat-label">Achievements</span>
-					</div>
-					<div class="stat-box" :style="{ color: completionPercentage === 100 ? '#ffc83d' : '#66c0f4' }">
-						<span class="stat-val">{{ completionPercentage }}%</span>
-						<span class="stat-label">Completion</span>
-					</div>
-					<div class="stat-box">
-						<span class="stat-val">{{ averageGlobal }}%</span>
-						<span class="stat-label">Avg. Global Rarity</span>
-					</div>
-				</div>
-
-				<!-- Achievements List -->
-				<div class="achievements-scroll">
-					<h3>All Achievements</h3>
-					<div v-if="sortedAchievements.length === 0" class="empty-text">
-						No achievement data available.
-					</div>
-
-					<AchievementTable
-							:achievements="sortedAchievements"
-							:show-game-column="false"
-							:sort-by="sortBy"
-							:sort-desc="sortDesc"
-							@sort="handleSort"
-					/>
 				</div>
 			</div>
+		</template>
+
+		<!-- Stats Grid -->
+		<div class="stats-grid">
+			<div class="stat-box">
+				<span class="stat-val">{{ stats.achieved }} / {{ stats.total }}</span>
+				<span class="stat-label">Achievements</span>
+			</div>
+			<div class="stat-box" :style="{ color: completionPercentage === 100 ? '#ffc83d' : '#66c0f4' }">
+				<span class="stat-val">{{ completionPercentage }}%</span>
+				<span class="stat-label">Completion</span>
+			</div>
+			<div class="stat-box">
+				<span class="stat-val">{{ averageGlobal }}%</span>
+				<span class="stat-label">Avg. Global Rarity</span>
+			</div>
 		</div>
-	</transition>
+
+		<!-- Achievements List -->
+		<div class="achievements-scroll">
+			<h3>All Achievements</h3>
+			<div v-if="sortedAchievements.length === 0" class="empty-text">
+				No achievement data available.
+			</div>
+
+			<AchievementTable
+					:achievements="sortedAchievements"
+					:show-game-column="false"
+					:sort-by="sortBy"
+					:sort-desc="sortDesc"
+					@sort="handleSort"
+			/>
+		</div>
+	</BaseOverlay>
 </template>
 
 <style scoped>
-.game-info-modal {
-	max-width: 900px;
-	width: 95%;
-	max-height: 90vh;
-	display: flex;
-	flex-direction: column;
-	padding: 0;
-	overflow: hidden;
-	position: relative;
-	background: #1b2838;
-}
-
-.close-btn-abs {
-	position: absolute;
-	top: 15px;
-	right: 15px;
-	background: transparent;
-	border: none;
-	color: #fff;
-	font-size: 1.5rem;
-	cursor: pointer;
-	z-index: 10;
-}
-
 .modal-header-custom {
-	padding: 25px;
-	background: linear-gradient(to right, #171a21, #2a475e);
+	padding: 0;
 	display: flex;
 	align-items: center;
 	gap: 20px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .game-icon-large {
@@ -239,64 +200,6 @@ const close = () => {
 	flex-wrap: wrap;
 }
 
-.checkbox-dropdown {
-	position: relative;
-	display: inline-block;
-}
-
-.dropdown-trigger {
-	font-size: 0.78rem;
-	padding: 3px 8px;
-	background: rgba(102, 192, 244, 0.08);
-	border: 1px solid rgba(102, 192, 244, 0.25);
-	border-radius: 4px;
-	color: #66c0f4;
-	cursor: pointer;
-	transition: background 0.2s;
-
-	&:hover {
-		background: rgba(102, 192, 244, 0.18);
-	}
-}
-
-.dropdown-menu {
-	position: absolute;
-	top: calc(100% + 4px);
-	left: 0;
-	z-index: 100;
-	background: #1b2838;
-	border: 1px solid rgba(102, 192, 244, 0.25);
-	border-radius: 5px;
-	padding: 6px 0;
-	min-width: 160px;
-	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-}
-
-.dropdown-item {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 5px 12px;
-	font-size: 0.82rem;
-	color: #c7d5e0;
-	cursor: pointer;
-	user-select: none;
-	transition: background 0.15s;
-
-	&:hover {
-		background: rgba(102, 192, 244, 0.1);
-	}
-
-	&.disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	input[type="checkbox"] {
-		accent-color: #66c0f4;
-		cursor: pointer;
-	}
-}
 
 .playtime-badge {
 	font-size: 0.85rem;

@@ -3,6 +3,7 @@ import {computed, reactive} from 'vue'
 import {useStatsAutoLoad} from '@/composables/useStatsAutoLoad.js'
 import {useRouter} from '@/router.js'
 import GameIconImg from '../ui/GameIconImg.vue'
+import {FontAwesomeIcon} from "@fortawesome/vue-fontawesome";
 
 const {state, getCompletionData} = useStatsAutoLoad()
 const {navigate} = useRouter()
@@ -190,10 +191,13 @@ const goToEdit = () => {
 				<div class="avatar-placeholder">?</div>
 				<h1>Guest</h1>
 			</div>
-			<button @click="goToEdit" class="btn btn-secondary edit-btn">Edit Profile</button>
+			<button @click="goToEdit" class="btn btn-secondary layout-btn">
+				<font-awesome-icon icon="pen" />
+				<span>Edit Profile</span>
+			</button>
 		</div>
 
-		<!-- 🕹️ Hero Grid (Stats) -->
+		<!-- Hero Grid (Stats) -->
 		<div class="hero-grid">
 			<div class="card-panel card-hover hero-card">
 				<div class="label">Total Games</div>
@@ -238,7 +242,7 @@ const goToEdit = () => {
 			</div>
 		</div>
 
-		<!-- 📊 Visualizations -->
+		<!-- Visualizations -->
 		<div class="viz-grid">
 			<!-- Backlog Ratio -->
 			<div class="card-panel viz-card">
@@ -282,9 +286,9 @@ const goToEdit = () => {
 			</div>
 		</div>
 
-		<!-- 🏆 Lists & Grids -->
+		<!-- Lists & Grids -->
 		<div class="content-section">
-			<h3>🏆 The Trophy Case (Perfect Games)</h3>
+			<h3><font-awesome-icon icon="trophy" class="section-icon" /> The Trophy Case (Perfect Games)</h3>
 			<div v-if="stats.trophyCase.length" class="trophy-grid">
 				<div v-for="game in stats.trophyCase" :key="game.appid" class="trophy-item">
 					<img :src="getPortraitUrl(game.appid)" loading="lazy" @error="onPortraitError(game.appid)" :alt="'Image for ' + game.name"/>
@@ -297,7 +301,7 @@ const goToEdit = () => {
 		<div class="lists-grid">
 			<!-- Recently Bingeing -->
 			<div class="card-panel list-card">
-				<h3>🔥 Recently Bingeing</h3>
+				<h3><font-awesome-icon icon="fire" class="section-icon" /> Recently Bingeing</h3>
 				<div class="simple-list">
 					<div v-for="game in stats.recent" :key="game.appid" class="list-row">
 						<GameIconImg
@@ -313,7 +317,7 @@ const goToEdit = () => {
 
 			<!-- Long Haul -->
 			<div class="card-panel list-card">
-				<h3>🏔️ The Long Haul (>500h)</h3>
+				<h3><font-awesome-icon icon="mountain" class="section-icon" /> The Long Haul (&gt;500h)</h3>
 				<div class="simple-list">
 					<div v-for="game in stats.longHaul" :key="game.appid" class="list-row">
 						<span class="name">{{ game.name }}</span>
@@ -325,7 +329,7 @@ const goToEdit = () => {
 
 			<!-- Graveyard -->
 			<div class="card-panel list-card">
-				<h3>🪦 The Graveyard (< 2h)</h3>
+				<h3><font-awesome-icon icon="skull" class="section-icon" /> The Graveyard (&lt; 2h)</h3>
 				<div class="simple-list">
 					<div v-for="game in stats.graveyard.slice(0, 10)" :key="game.appid" class="list-row muted">
 						<span class="name">{{ game.name }}</span>

@@ -1,8 +1,10 @@
 <script setup>
-import {ref, computed, onMounted} from "vue";
+import {ref, computed, onMounted, watch} from "vue";
 import {useSteam} from "@/composables/useSteam.js";
 import {useSteamLogin} from "@/composables/useSteamLogin.js";
+import {copyToClipboard} from "@/utils/clipboard.js";
 import GameIconImg from "../ui/GameIconImg.vue";
+import {FontAwesomeIcon} from "@fortawesome/vue-fontawesome";
 
 const {
 	state,
@@ -13,14 +15,12 @@ const {
 	setGamesVisibility,
 	importCollections,
 	isGameDuplicated,
-	getGameColumns,
-	removeGameFromColumn,
 } = useSteam();
 const {loginWithSteam: loginWithSteamRaw} = useSteamLogin();
 
 const loginWithSteam = () => loginWithSteamRaw("#/profile/edit");
 
-const newApiKey = ref("");
+const userApiKey = ref("");
 const newSteamId = ref("");
 const searchTerm = ref("");
 const showHiddenOnly = ref(false);
@@ -61,31 +61,42 @@ const selectedOS = ref(detectOS());
 const cmdCopied = ref(false);
 
 const currentConfig = computed(() => OS_CONFIG[selectedOS.value]);
+const isSetupIncomplete = computed(() => !state.hasServerApiKey && !state.apiKey?.trim());
+const apiKeyError = computed(() => state.error || "");
+const advancedSummaryText = computed(() =>
+	state.hasServerApiKey
+		? "Advanced: Optional Overrides (ID / API Key)"
+		: "Advanced: Set ID Manually",
+);
 
 const copyCommand = async () => {
-	try {
-		await navigator.clipboard.writeText(currentConfig.value.command);
+	const ok = await copyToClipboard(currentConfig.value.command);
+	if (ok) {
 		cmdCopied.value = true;
 		setTimeout(() => {
 			cmdCopied.value = false;
 		}, 2000);
-	} catch {
-		/* ignore */
+	} else {
+		alert("Failed to copy. Please select the command text and copy it manually.");
 	}
 };
 
 onMounted(() => {
 	loadState();
-	newApiKey.value = state.apiKey;
+	userApiKey.value = state.apiKey;
 	newSteamId.value = state.steamId;
 });
 
+watch(() => state.apiKey, (value) => {
+	userApiKey.value = value || "";
+});
+
 const saveSettings = async () => {
-	state.apiKey = newApiKey.value;
+	state.apiKey = userApiKey.value.trim();
 	state.steamId = newSteamId.value;
 	// Trigger save via watcher in composable
 	// Also try to fetch games if changed
-	if (state.apiKey && state.steamId) {
+	if (state.steamId && (state.apiKey || state.hasServerApiKey)) {
 		await refreshLibrary();
 	}
 };
@@ -122,13 +133,13 @@ const handleImportCollections = async () => {
 		try {
 			data = JSON.parse(importJson.value);
 		} catch {
-			throw new Error(
-					"Invalid JSON. Please paste the exact output from the extraction script.",
-			);
+			importError.value = "Invalid JSON. Please paste the exact output from the extraction script.";
+			return;
 		}
 
 		if (!data.collections || !Array.isArray(data.collections)) {
-			throw new Error('Invalid format. Expected {"collections": [...]}');
+			importError.value = 'Invalid format. Expected {"collections": [...]}';
+			return;
 		}
 
 		if (importMode.value === 'replace') {
@@ -141,8 +152,7 @@ const handleImportCollections = async () => {
 			}
 		}
 
-		const result = importCollections(data, importMode.value, importOnlyUnassigned.value);
-		importResult.value = result;
+		importResult.value = importCollections(data, importMode.value, importOnlyUnassigned.value);
 		importJson.value = "";
 	} catch (e) {
 		importError.value = e.message;
@@ -190,25 +200,51 @@ const handleFileUpload = (event) => {
 				</div>
 			</div>
 
-			<div class="form-group">
-				<label>Steam Web API Key</label>
+			<div class="form-group" v-if="!state.hasServerApiKey">
+				<label class="label-with-badge">
+					<span :class="{ 'setup-required-label-text': isSetupIncomplete }">Steam Web API Key</span>
+					<span v-if="isSetupIncomplete" class="setup-required-badge">Required</span>
+				</label>
 				<input
-						v-model="newApiKey"
+						v-model="userApiKey"
 						type="password"
 						placeholder="Enter API Key"
-						class="input-field"
+						:class="['input-field', { 'setup-required-input': isSetupIncomplete }]"
 				/>
 				<p class="hint">
 					Get your key
 					<a href="https://steamcommunity.com/dev/apikey" target="_blank"
 					>here</a
-					>. Required to fetch games.
+					>. Required to fetch games unless a server key is configured.
+				</p>
+				<p v-if="apiKeyError" class="input-context-error">
+					<font-awesome-icon icon="triangle-exclamation" />
+					<span>{{ apiKeyError }}</span>
 				</p>
 			</div>
 
 			<!-- Optional manual override for ID -->
-			<details class="advanced-settings">
-				<summary>Advanced: Set ID Manually</summary>
+			<details class="advanced-settings" :open="Boolean(apiKeyError) && state.hasServerApiKey">
+				<summary>{{ advancedSummaryText }}</summary>
+				<div class="form-group indented" v-if="state.hasServerApiKey">
+					<label>Steam Web API Key</label>
+					<input
+							v-model="userApiKey"
+							type="password"
+							placeholder="Enter API Key"
+							class="input-field"
+					/>
+					<p v-if="apiKeyError" class="input-context-error">
+						<font-awesome-icon icon="triangle-exclamation" />
+						<span>{{ apiKeyError }}</span>
+					</p>
+					<p class="hint">
+						Optional override if you want to use 
+						<a href="https://steamcommunity.com/dev/apikey" target="_blank"
+						>your own Steam Web API Key</a
+						>.
+					</p>
+				</div>
 				<div class="form-group indented">
 					<label>Steam ID (64-bit)</label>
 					<input
@@ -228,7 +264,6 @@ const handleFileUpload = (event) => {
 				</button>
 			</div>
 
-			<p v-if="state.error" class="error">{{ state.error }}</p>
 		</div>
 
 		<div class="card-panel import-section">
@@ -312,7 +347,7 @@ const handleFileUpload = (event) => {
 					A game in multiple collections will be placed in the last one listed.
 				</p>
 				<p class="import-mode-hint" v-else>
-					⚠️ Removes all existing columns and replaces them with the imported collections.
+					<font-awesome-icon icon="triangle-exclamation" /> Removes all existing columns and replaces them with the imported collections.
 					Games not in any collection will be moved to "Backlog".
 				</p>
 
@@ -334,7 +369,7 @@ const handleFileUpload = (event) => {
 			</div>
 
 			<div v-if="importResult" class="import-result success">
-				<p>✅ Import complete!</p>
+				<p><font-awesome-icon icon="circle-check" /> Import complete!</p>
 				<ul>
 					<li>
 						Games moved: <strong>{{ importResult.gamesMoved }}</strong>
@@ -342,7 +377,7 @@ const handleFileUpload = (event) => {
 					<li v-if="importResult.gamesReset">
 						Games reset to Backlog: <strong>{{ importResult.gamesReset }}</strong>
 					</li>
-					<li v-if="importResult.columnsCreated.length">
+					<li v-if="importResult.columnsCreated && importResult.columnsCreated?.length">
 						New columns created:
 						<strong>{{ importResult.columnsCreated.join(", ") }}</strong>
 					</li>

@@ -15,9 +15,8 @@
   color: #4f5b66;
   font-size: 0.8rem;
   border-top: 1px solid var(--steam-blue-dark);
-  width: 100vw;
   flex-shrink: 0; 
   position: relative;
-  z-index: 99999;
+  z-index: 999;
 }
 </style>

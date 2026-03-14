@@ -18,34 +18,34 @@ const {loginWithSteam} = useSteamLogin()
 
 		<div class="features-grid">
 			<div class="card-panel card-hover feature-card">
-				<div class="icon">📋</div>
+				<div class="icon"><font-awesome-icon icon="clipboard-list" /></div>
 				<h3>Kanban Board</h3>
 				<p>Drag and drop your games between Backlog, Playing, and Completed. Customize your workflow with custom
 					columns.</p>
 			</div>
 			<div class="card-panel card-hover feature-card">
-				<div class="icon">🏆</div>
+				<div class="icon"><font-awesome-icon icon="trophy" /></div>
 				<h3>Achievement Tracking</h3>
 				<p>Visualize your progress - group games by completion percentage and hunt down those
 					100% perfect games.</p>
 			</div>
 			<div class="card-panel card-hover feature-card">
-				<div class="icon">📊</div>
+				<div class="icon"><font-awesome-icon icon="chart-bar" /></div>
 				<h3>Advanced Analytics</h3>
 				<p>Deep dive into your gaming habits with completion scores, playtime distribution, and backlog ratios.</p>
 			</div>
 			<div class="card-panel card-hover feature-card">
-				<div class="icon">🔍</div>
+				<div class="icon"><font-awesome-icon icon="magnifying-glass" /></div>
 				<h3>Library Management</h3>
 				<p>Filter out games - hide the ones you'll never play, and focus on what matters.</p>
 			</div>
 			<div class="card-panel card-hover feature-card">
-				<div class="icon">💻</div>
+				<div class="icon"><font-awesome-icon icon="shield-halved" /></div>
 				<h3>Keep your data safe</h3>
 				<p>Your browser does all the work! No data will be saved on any server.</p>
 			</div>
 			<div class="card-panel card-hover feature-card">
-				<div class="icon">😉</div>
+				<div class="icon"><font-awesome-icon icon="face-smile-wink" /></div>
 				<h3>More to come</h3>
 				<p>I will add more stuff if I need more stuff for my own personal use.</p>
 			</div>
