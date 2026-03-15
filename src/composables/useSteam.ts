@@ -9,6 +9,22 @@ const DB_NAME = 'SteamKanbanDB'
 // TODO: If we need to change the structure later, we can increment this version and handle migrations in onupgradeneeded
 const DB_VERSION = 2
 
+type GameMoveDetail = {
+    appid: number
+    name: string
+    oldColumns: string[]
+    newColumns: string[]
+}
+
+type ImportCollectionsResult = {
+    columnsCreated: string[]
+    columnsRemoved: string[]
+    gamesMoved: number
+    gamesReset: number
+    gamesNotFound: number
+    movedGames: GameMoveDetail[]
+}
+
 const getColumnName = (column: string | { name: string }): string =>
     typeof column === 'string' ? column : column.name
 
@@ -660,9 +676,9 @@ const setGamesVisibility = async (games: SteamGame[], isHidden: boolean): Promis
  *   - 'replace': remove all non-Backlog columns, replace with collection columns,
  *                 games not in any collection fall back to "Backlog"
  * @param {boolean} onlyUnassigned - If true, only move games currently in "Backlog"
- * @returns {{ columnsCreated: string[], columnsRemoved: string[], gamesMoved: number, gamesReset: number, gamesNotFound: number }}
+ * @returns {{ columnsCreated: string[], columnsRemoved: string[], gamesMoved: number, gamesReset: number, gamesNotFound: number, movedGames: Array<{ appid: number, name: string, oldColumns: string[], newColumns: string[] }> }}
  */
-const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'replace' = 'add', onlyUnassigned: boolean = false): Promise<{ columnsCreated: string[]; columnsRemoved: string[]; gamesMoved: number; gamesReset: number; gamesNotFound: number }> => {
+const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'replace' = 'add', onlyUnassigned: boolean = false): Promise<ImportCollectionsResult> => {
     if (!data || !Array.isArray(data.collections)) {
         throw new Error('Invalid import data: expected { collections: [...] }')
     }
@@ -672,6 +688,7 @@ const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'r
     let gamesMoved = 0
     let gamesReset = 0
     let gamesNotFound = 0
+    const movedGames: GameMoveDetail[] = []
 
     const columnsEqual = (a: string[] = [], b: string[] = []) => {
         if (a.length !== b.length) return false
@@ -719,10 +736,21 @@ const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'r
         // Assign every game
         for (const game of state.games) {
             const targetColumns = gameToColumns.get(game.appid) || []
+            const oldColumns = [game.status, ...(game.duplicateColumns || [])]
             if (targetColumns.length > 0) {
-                const targetPrimary = targetColumns[targetColumns.length - 1]
-                const targetDupes = targetColumns.filter(c => c !== targetPrimary)
+                const targetPrimary = targetColumns.includes(game.status)
+                    ? game.status
+                    : targetColumns[targetColumns.length - 1]
                 const currentDupes = game.duplicateColumns || []
+
+                // Preserve existing duplicate order for shared memberships to avoid
+                // noisy reorder-only changes when import sources list columns differently.
+                const targetSet = new Set(targetColumns)
+                const targetDupes = currentDupes.filter(c => c !== targetPrimary && targetSet.has(c))
+                for (const col of targetColumns) {
+                    if (col === targetPrimary || targetDupes.includes(col)) continue
+                    targetDupes.push(col)
+                }
 
                 let changed = false
                 if (game.status !== targetPrimary) {
@@ -737,6 +765,12 @@ const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'r
 
                 if (changed) {
                     gamesMoved++
+                    movedGames.push({
+                        appid: game.appid,
+                        name: game.name,
+                        oldColumns,
+                        newColumns: [game.status, ...(game.duplicateColumns || [])]
+                    })
                 }
             } else {
                 if (game.status !== BACKLOG_COLUMN) {
@@ -746,6 +780,15 @@ const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'r
 
                 if ((game.duplicateColumns || []).length > 0) {
                     game.duplicateColumns = []
+                }
+
+                if (!columnsEqual(oldColumns, [game.status, ...(game.duplicateColumns || [])])) {
+                    movedGames.push({
+                        appid: game.appid,
+                        name: game.name,
+                        oldColumns,
+                        newColumns: [game.status, ...(game.duplicateColumns || [])]
+                    })
                 }
             }
         }
@@ -765,12 +808,25 @@ const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'r
                 continue
             }
 
+            const oldColumns = [game.status, ...(game.duplicateColumns || [])]
+
             // Skip if only assigning unassigned games and game is not in Backlog
             if (onlyUnassigned && game.status !== BACKLOG_COLUMN) continue
 
-            const targetPrimary = targetColumns[targetColumns.length - 1]
-            const nextDupesSet = new Set<string>([...(game.duplicateColumns || []), ...targetColumns])
+            // Preserve existing primary if it is already part of imported memberships.
+            // This prevents noisy A,B -> B,A "moves" when only order differs.
+            const targetPrimary = targetColumns.includes(game.status)
+                ? game.status
+                : targetColumns[targetColumns.length - 1]
+
+            const nextDupesSet = new Set<string>(game.duplicateColumns || [])
+            for (const col of targetColumns) {
+                nextDupesSet.add(col)
+            }
             nextDupesSet.delete(targetPrimary)
+            if (targetPrimary !== game.status) {
+                nextDupesSet.delete(game.status)
+            }
             const nextDupes = Array.from(nextDupesSet)
 
             const primaryChanged = game.status !== targetPrimary
@@ -781,6 +837,12 @@ const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'r
             game.status = targetPrimary
             game.duplicateColumns = nextDupes
             gamesMoved++
+            movedGames.push({
+                appid: game.appid,
+                name: game.name,
+                oldColumns,
+                newColumns: [game.status, ...(game.duplicateColumns || [])]
+            })
         }
     }
 
@@ -788,7 +850,7 @@ const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'r
     await saveAllGamesToDB(state.games)
     saveMetadata()
 
-    return {columnsCreated, columnsRemoved, gamesMoved, gamesReset, gamesNotFound}
+    return {columnsCreated, columnsRemoved, gamesMoved, gamesReset, gamesNotFound, movedGames}
 }
 
 export function useSteam() {

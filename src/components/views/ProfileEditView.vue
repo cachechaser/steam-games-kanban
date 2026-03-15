@@ -8,12 +8,20 @@ import {FontAwesomeIcon} from "@fortawesome/vue-fontawesome";
 import { CollectionImportPayload, SteamGame} from "@/types/domain";
 
 type ImportMode = 'add' | 'replace';
+type ImportMoveDetail = {
+	appid: number;
+	name: string;
+	oldColumns: string[];
+	newColumns: string[];
+};
+
 type ImportResult = {
 	columnsCreated: string[];
 	columnsRemoved: string[];
 	gamesMoved: number;
 	gamesReset: number;
 	gamesNotFound: number;
+	movedGames: ImportMoveDetail[];
 };
 
 const {
@@ -389,6 +397,15 @@ const handleFileUpload = (event: Event) => {
 				<ul>
 					<li>
 						Games moved: <strong>{{ importResult.gamesMoved }}</strong>
+						<details v-if="importResult.movedGames?.length" class="moved-games-details">
+							<summary>Show moved games</summary>
+							<ul>
+								<li v-for="move in importResult.movedGames" :key="move.appid">
+									<strong>{{ move.name }}</strong>
+									({{ move.oldColumns.join(", ") || "None" }} -> {{ move.newColumns.join(", ") || "None" }})
+								</li>
+							</ul>
+						</details>
 					</li>
 					<li v-if="importResult.gamesReset">
 						Games reset to Backlog: <strong>{{ importResult.gamesReset }}</strong>

@@ -234,6 +234,29 @@ describe('useSteam behavior', () => {
     expect(steam.state.games.find((g) => g.appid === 20)?.duplicateColumns).toEqual(['Completed'])
   })
 
+  it('does not count reorder-only overlap as moved in add mode', async () => {
+    installIndexedDbMock()
+    vi.stubGlobal('fetch', vi.fn(async () => makeJsonResponse({ hasServerApiKey: false })))
+
+    const steam = await importFreshSteam()
+    steam.state.columns = ['Backlog', 'Achievement hunting', 'Common']
+    steam.state.games = [
+      { appid: 10, name: 'A', status: 'Achievement hunting', duplicateColumns: ['Common'] } as SteamGame
+    ]
+
+    const result = await steam.importCollections({
+      collections: [
+        { name: 'Common', game_ids: [10] },
+        { name: 'Achievement hunting', game_ids: [10] }
+      ]
+    }, 'add', false)
+
+    expect(result.gamesMoved).toBe(0)
+    expect(result.movedGames).toEqual([])
+    expect(steam.state.games[0].status).toBe('Achievement hunting')
+    expect(steam.state.games[0].duplicateColumns).toEqual(['Common'])
+  })
+
   it('imports collections in replace mode and resets unassigned games', async () => {
     installIndexedDbMock()
     vi.stubGlobal('fetch', vi.fn(async () => makeJsonResponse({ hasServerApiKey: false })))
@@ -259,6 +282,60 @@ describe('useSteam behavior', () => {
     expect(steam.state.games.find((g) => g.appid === 10)?.status).toBe('Replay')
     expect(steam.state.games.find((g) => g.appid === 10)?.duplicateColumns).toEqual(['Favorites'])
     expect(steam.state.games.find((g) => g.appid === 20)?.status).toBe('Backlog')
+  })
+
+  it('does not count reorder-only overlap as moved in replace mode', async () => {
+    installIndexedDbMock()
+    vi.stubGlobal('fetch', vi.fn(async () => makeJsonResponse({ hasServerApiKey: false })))
+
+    const steam = await importFreshSteam()
+    steam.state.columns = ['Backlog', 'Achievement hunting', 'Common']
+    steam.state.games = [
+      { appid: 10, name: 'A', status: 'Achievement hunting', duplicateColumns: ['Common'] } as SteamGame
+    ]
+
+    const result = await steam.importCollections({
+      collections: [
+        { name: 'Common', game_ids: [10] },
+        { name: 'Achievement hunting', game_ids: [10] }
+      ]
+    }, 'replace', false)
+
+    expect(result.gamesMoved).toBe(0)
+    expect(result.gamesReset).toBe(0)
+    expect(result.movedGames).toEqual([])
+    expect(steam.state.games[0].status).toBe('Achievement hunting')
+    expect(steam.state.games[0].duplicateColumns).toEqual(['Common'])
+  })
+
+  it('does not count duplicate-order-only changes as moved in replace mode', async () => {
+    installIndexedDbMock()
+    vi.stubGlobal('fetch', vi.fn(async () => makeJsonResponse({ hasServerApiKey: false })))
+
+    const steam = await importFreshSteam()
+    steam.state.columns = ['Backlog', 'Achievement hunting', 'Common', 'possible 100%']
+    steam.state.games = [
+      {
+        appid: 10,
+        name: 'A',
+        status: 'Achievement hunting',
+        duplicateColumns: ['Common', 'possible 100%']
+      } as SteamGame
+    ]
+
+    const result = await steam.importCollections({
+      collections: [
+        { name: 'possible 100%', game_ids: [10] },
+        { name: 'Common', game_ids: [10] },
+        { name: 'Achievement hunting', game_ids: [10] }
+      ]
+    }, 'replace', false)
+
+    expect(result.gamesMoved).toBe(0)
+    expect(result.gamesReset).toBe(0)
+    expect(result.movedGames).toEqual([])
+    expect(steam.state.games[0].status).toBe('Achievement hunting')
+    expect(steam.state.games[0].duplicateColumns).toEqual(['Common', 'possible 100%'])
   })
 
   it('refreshes library and builds detailed achievements for update targets', async () => {
