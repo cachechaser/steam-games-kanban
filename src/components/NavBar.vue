@@ -22,7 +22,14 @@ const handleSyncClick = () => {
 	<nav class="navbar">
 		<div class="container">
 			<div class="left-section">
-				<button type="button" class="logo" @click="navigate('/')">Steam Backlog</button>
+				<button
+					type="button"
+					class="logo"
+					@click="navigate('/')"
+					aria-label="Steam Kanban"
+				>
+					<img src="/icon.svg" alt="Steam Kanban" class="logo-img"/>
+				</button>
 				<div class="links" v-if="state.steamId">
 					<button type="button" class="nav-link" :class="{ active: isActive('Board') }" @click="navigate('/')">
 						<font-awesome-icon icon="table-columns" class="nav-icon" />
@@ -122,24 +129,120 @@ const handleSyncClick = () => {
 }
 
 .logo {
-	font-size: 1.5rem;
-	font-weight: 900;
-	letter-spacing: 1px;
-	background-color: transparent;
-	background: linear-gradient(135deg, var(--steam-blue-light) 0%, #ffffff 100%);
+	background: transparent;
 	border: none;
-	-webkit-background-clip: text;
-	-webkit-text-fill-color: transparent;
-	text-decoration: none;
 	cursor: pointer;
-	transition: opacity 0.3s;
-	text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-	white-space: nowrap;
+	display: flex;
+	align-items: center;
+	padding: 0;
+	position: relative;
+	border-radius: 12px;
+	transition: transform 0.25s ease, opacity 0.25s ease;
+	overflow: visible;
 }
 
 .logo:hover {
-	opacity: 0.9;
-	transform: scale(1.02);
+	opacity: 1;
+}
+
+.logo-img {
+	height: 34px;
+	width: auto;
+	display: block;
+	position: relative;
+	z-index: 2;
+	transition: filter 0.35s ease;
+}
+
+.logo::before,
+.logo::after {
+	content: '';
+	position: absolute;
+	border-radius: 14px;
+	opacity: 0;
+	transition: opacity 0.3s ease;
+	pointer-events: none;
+}
+
+.logo::before {
+	background: linear-gradient(120deg, #ff5252 0%, #ff9900 30%, #b4e508 58%, #b4e508 76%, #ff5252 100%);
+	background-size: 300% 300%;
+	filter: blur(12px);
+	z-index: 0;
+}
+
+.logo::after {
+	background: linear-gradient(120deg, rgba(255, 82, 82, 0.32) 0%, rgba(255, 153, 0, 0.32) 30%, rgba(180, 229, 8, 0.48) 58%, rgba(180, 229, 8, 0.48) 76%, rgba(255, 82, 82, 0.32) 100%);
+	background-size: 300% 300%;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	z-index: 1;
+}
+
+.logo:hover::before {
+	opacity: 1;
+	animation: logoGlowPulse 1.6s ease-in-out infinite, logoGradientLoop 4.2s linear infinite;
+}
+
+.logo:hover::after {
+	opacity: 1;
+	animation: logoGradientLoop 4.2s linear infinite;
+}
+
+.logo:hover .logo-img {
+	animation: logoIconGlowLoop 4.2s linear infinite;
+}
+
+.logo:focus-visible {
+	outline: none;
+}
+
+.logo:focus-visible::before,
+.logo:focus-visible::after {
+	opacity: 1;
+}
+
+@keyframes logoGlowPulse {
+	0%,
+	100% {
+		filter: blur(12px) saturate(1);
+	}
+	50% {
+		filter: blur(16px) saturate(1.2);
+	}
+}
+
+@keyframes logoGradientLoop {
+	0% {
+		background-position: 0 50%;
+	}
+	33% {
+		background-position: 45% 50%;
+	}
+	66% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0 50%;
+	}
+}
+
+@keyframes logoIconGlowLoop {
+	0%,
+	100% {
+		filter:
+			drop-shadow(0 0 4px rgba(255, 82, 82, 0.45))
+			drop-shadow(0 0 10px rgba(255, 82, 82, 0.35));
+	}
+	33% {
+		filter:
+			drop-shadow(0 0 4px rgba(255, 153, 0, 0.45))
+			drop-shadow(0 0 10px rgba(255, 153, 0, 0.35));
+	}
+	66% {
+		filter:
+			drop-shadow(0 0 5px rgba(180, 229, 8, 0.62))
+			drop-shadow(0 0 14px rgba(180, 229, 8, 0.5));
+	}
 }
 
 .links {
@@ -313,8 +416,11 @@ const handleSyncClick = () => {
 	}
 
 	.logo {
-		font-size: 1.1rem;
-		/* Keep visible but smaller */
+		max-width: 130px;
+	}
+
+	.logo-img {
+		height: 28px;
 	}
 
 	.links {
