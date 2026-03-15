@@ -1,5 +1,14 @@
 import { ref, computed, toRaw } from 'vue'
 import { useSteam } from './useSteam'
+import { Status } from '@/types/sync'
+import type {
+    DataChannelMessage,
+    PersistedRoom,
+    SignalingMessage,
+    SyncDataPayload,
+    SyncDirection,
+    SyncStatus,
+} from '@/types/sync'
 
 /**
  * Composable for WebRTC-based data synchronization between devices.
@@ -14,26 +23,15 @@ import { useSteam } from './useSteam'
  * 7. Room is destroyed (one-time use)
  */
 
-/** Connection status enum */
-const Status = {
-    IDLE: 'idle',
-    CREATING_ROOM: 'creating-room',
-    WAITING_FOR_PEER: 'waiting-for-peer',
-    JOINING_ROOM: 'joining-room',
-    CONNECTING: 'connecting',
-    TRANSFERRING: 'transferring',
-    COMPLETE: 'complete',
-    ERROR: 'error'
-}
 
 const SESSION_KEY = 'steam_sync_room'
 
 // Build ICE server config from env
-const buildIceServers = () => {
-    const servers = []
+const buildIceServers = (): RTCIceServer[] => {
+    const servers: RTCIceServer[] = []
 
     const stunUrls = import.meta.env.VITE_STUN_URLS || 'stun:stun.l.google.com:19302'
-    stunUrls.split(',').forEach(url => {
+    stunUrls.split(',').forEach((url: string) => {
         if (url.trim()) servers.push({ urls: url.trim() })
     })
 
@@ -50,28 +48,68 @@ const buildIceServers = () => {
 }
 
 // Singleton state so multiple components can access it
-const status = ref(Status.IDLE)
+const status = ref<SyncStatus>(Status.IDLE)
 const roomId = ref('')
 const errorMessage = ref('')
 const progress = ref(0) // 0-100 for transfer progress
 const isOverlayOpen = ref(false)
-const syncDirection = ref('send') // 'send' | 'receive'
+const syncDirection = ref<SyncDirection>('send')
 
-let ws = null
-let peerConnection = null
-let dataChannel = null
-let receiveBuffer = []
+let ws: WebSocket | null = null
+let peerConnection: RTCPeerConnection | null = null
+let dataChannel: RTCDataChannel | null = null
+let receiveBuffer: string[] = []
 let expectedChunks = 0
-let visibilityHandler = null
+let visibilityHandler: (() => void) | null = null
 let sendComplete = false
 
-const getWsUrl = () => {
+const getErrorMessage = (error: unknown): string => {
+    return error instanceof Error ? error.message : String(error)
+}
+
+const isPersistedRoom = (value: unknown): value is PersistedRoom => {
+    if (!value || typeof value !== 'object') return false
+    const candidate = value as Record<string, unknown>
+    return typeof candidate.roomId === 'string' && (candidate.direction === 'send' || candidate.direction === 'receive')
+}
+
+const isSyncDataPayload = (value: unknown): value is SyncDataPayload => {
+    if (!value || typeof value !== 'object') return false
+    const candidate = value as Record<string, unknown>
+    return typeof candidate.version === 'number' && Array.isArray(candidate.games)
+}
+
+const parseDataChannelMessage = (raw: string): DataChannelMessage | null => {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    switch (parsed.type) {
+        case 'sync-header':
+            if (typeof parsed.totalChunks === 'number' && typeof parsed.totalSize === 'number') {
+                return { type: 'sync-header', totalChunks: parsed.totalChunks, totalSize: parsed.totalSize }
+            }
+            return null
+        case 'sync-chunk':
+            if (typeof parsed.index === 'number' && typeof parsed.data === 'string') {
+                return { type: 'sync-chunk', index: parsed.index, data: parsed.data }
+            }
+            return null
+        case 'sync-done':
+            return { type: 'sync-done' }
+        default:
+            return null
+    }
+}
+
+const parseSignalingMessage = (raw: string): SignalingMessage => {
+    return JSON.parse(raw) as SignalingMessage
+}
+
+const getWsUrl = (): string => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     return `${protocol}//${window.location.host}/ws/signal`
 }
 
 /** Save room to sessionStorage so we can rejoin after leaving/returning to the page. */
-const persistRoom = () => {
+const persistRoom = (): void => {
     if (roomId.value && syncDirection.value === 'send') {
         sessionStorage.setItem(SESSION_KEY, JSON.stringify({
             roomId: roomId.value,
@@ -81,11 +119,11 @@ const persistRoom = () => {
 }
 
 /** Clear persisted room. */
-const clearPersistedRoom = () => {
+const clearPersistedRoom = (): void => {
     sessionStorage.removeItem(SESSION_KEY)
 }
 
-const cleanup = () => {
+const cleanup = (): void => {
     if (dataChannel) {
         dataChannel.close()
         dataChannel = null
@@ -104,7 +142,7 @@ const cleanup = () => {
     removeVisibilityListener()
 }
 
-const reset = () => {
+const reset = (): void => {
     cleanup()
     clearPersistedRoom()
     status.value = Status.IDLE
@@ -117,7 +155,7 @@ const reset = () => {
 /**
  * Collect all syncable data from the app state.
  */
-const collectSyncData = () => {
+const collectSyncData = (): string => {
     const { state } = useSteam()
     const rawState = toRaw(state)
 
@@ -139,13 +177,15 @@ const collectSyncData = () => {
 /**
  * Apply received sync data to the local app state.
  */
-const applySyncData = async (jsonStr) => {
+const applySyncData = async (jsonStr: string): Promise<void> => {
     const { state, loadState } = useSteam()
-    const data = JSON.parse(jsonStr)
+    const parsed: unknown = JSON.parse(jsonStr)
 
-    if (!data.version || !data.games) {
+    if (!isSyncDataPayload(parsed)) {
         throw new Error('Invalid sync data format')
     }
+    const data = parsed
+
 
     // Write metadata to localStorage
     const metaKey = 'steam_kanban_state'
@@ -160,12 +200,12 @@ const applySyncData = async (jsonStr) => {
     // Write games to IndexedDB
     const DB_NAME = 'SteamKanbanDB'
     const DB_VERSION = 2
-    const db = await new Promise((resolve, reject) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const req = indexedDB.open(DB_NAME, DB_VERSION)
         req.onerror = () => reject(req.error)
         req.onsuccess = () => resolve(req.result)
-        req.onupgradeneeded = (e) => {
-            const db = e.target.result
+        req.onupgradeneeded = (e: IDBVersionChangeEvent) => {
+            const db = (e.target as IDBOpenDBRequest).result
             if (!db.objectStoreNames.contains('games')) {
                 db.createObjectStore('games', { keyPath: 'appid' })
             }
@@ -173,7 +213,7 @@ const applySyncData = async (jsonStr) => {
     })
 
     // Clear existing games first
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
         const tx = db.transaction('games', 'readwrite')
         tx.objectStore('games').clear()
         tx.oncomplete = () => resolve()
@@ -181,7 +221,7 @@ const applySyncData = async (jsonStr) => {
     })
 
     // Write all received games
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
         const tx = db.transaction('games', 'readwrite')
         const store = tx.objectStore('games')
         data.games.forEach(game => store.put(game))
@@ -198,13 +238,13 @@ const applySyncData = async (jsonStr) => {
  * Waits for the send buffer to drain when it gets too full,
  * preventing "RTCDataChannel send queue is full" errors.
  */
-const sendData = async (channel, jsonStr) => {
+const sendData = async (channel: RTCDataChannel, jsonStr: string): Promise<void> => {
     const CHUNK_SIZE = 16384 // 16KB chunks
     const BUFFER_THRESHOLD = 256 * 1024 // pause sending when buffered > 256KB
     const totalChunks = Math.ceil(jsonStr.length / CHUNK_SIZE)
 
     /** Wait until bufferedAmount drops below the threshold. */
-    const waitForDrain = () => new Promise((resolve) => {
+    const waitForDrain = () => new Promise<void>((resolve) => {
         const check = () => {
             if (channel.bufferedAmount < BUFFER_THRESHOLD) {
                 resolve()
@@ -235,7 +275,7 @@ const sendData = async (channel, jsonStr) => {
     sendComplete = true
 }
 
-const setupPeerConnection = (isHost) => {
+const setupPeerConnection = (isHost: boolean): void => {
     const iceServers = buildIceServers()
     peerConnection = new RTCPeerConnection({ iceServers })
 
@@ -268,7 +308,7 @@ const setupPeerConnection = (isHost) => {
     }
 }
 
-const setupDataChannel = (channel, isHost) => {
+const setupDataChannel = (channel: RTCDataChannel, isHost: boolean): void => {
     channel.onopen = async () => {
         status.value = Status.TRANSFERRING
 
@@ -278,7 +318,7 @@ const setupDataChannel = (channel, isHost) => {
                 const data = collectSyncData()
                 await sendData(channel, data)
             } catch (e) {
-                errorMessage.value = `Failed to prepare data: ${e.message}`
+                errorMessage.value = `Failed to prepare data: ${getErrorMessage(e)}`
                 status.value = Status.ERROR
             }
         }
@@ -286,7 +326,9 @@ const setupDataChannel = (channel, isHost) => {
 
     channel.onmessage = (event) => {
         try {
-            const msg = JSON.parse(event.data)
+            if (typeof event.data !== 'string') return
+            const msg = parseDataChannelMessage(event.data)
+            if (!msg) return
 
             switch (msg.type) {
                 case 'sync-header':
@@ -301,7 +343,10 @@ const setupDataChannel = (channel, isHost) => {
                     break
 
                 case 'sync-done':
-                    handleSyncDone()
+                    handleSyncDone().then(r => r).catch(e => {
+                        errorMessage.value = `Failed to apply data: ${getErrorMessage(e)}`
+                        status.value = Status.ERROR
+                    })
                     break
             }
         } catch (e) {
@@ -327,7 +372,7 @@ const setupDataChannel = (channel, isHost) => {
     }
 }
 
-const handleSyncDone = async () => {
+const handleSyncDone = async (): Promise<void> => {
     try {
         const fullData = receiveBuffer.join('')
         await applySyncData(fullData)
@@ -343,7 +388,7 @@ const handleSyncDone = async () => {
         // Clean up after a short delay
         setTimeout(() => cleanup(), 2000)
     } catch (e) {
-        errorMessage.value = `Failed to apply data: ${e.message}`
+        errorMessage.value = `Failed to apply data: ${getErrorMessage(e)}`
         status.value = Status.ERROR
     }
 }
@@ -352,12 +397,13 @@ const handleSyncDone = async () => {
  * Connect (or reconnect) the host WebSocket and attach message handlers.
  * @param {boolean} isRejoin - If true, send rejoin-room instead of create-room.
  */
-const connectHostWs = (isRejoin = false) => {
+const connectHostWs = (isRejoin: boolean = false): void => {
     if (ws && ws.readyState === WebSocket.OPEN) return // already connected
 
     ws = new WebSocket(getWsUrl())
 
     ws.onopen = () => {
+        if (!ws) return
         if (isRejoin && roomId.value) {
             ws.send(JSON.stringify({ type: 'rejoin-room', roomId: roomId.value }))
         } else {
@@ -366,10 +412,12 @@ const connectHostWs = (isRejoin = false) => {
     }
 
     ws.onmessage = async (event) => {
-        const msg = JSON.parse(event.data)
+        if (typeof event.data !== 'string') return
+        const msg = parseSignalingMessage(event.data)
 
         switch (msg.type) {
             case 'room-created':
+                if (!msg.roomId) break
                 roomId.value = msg.roomId
                 status.value = Status.WAITING_FOR_PEER
                 persistRoom()
@@ -384,17 +432,19 @@ const connectHostWs = (isRejoin = false) => {
                 status.value = Status.CONNECTING
                 setupPeerConnection(true)
                 try {
-                    const offer = await peerConnection.createOffer()
-                    await peerConnection.setLocalDescription(offer)
+                    const pc = peerConnection
+                    if (!pc || !ws) break
+                    const offer = await pc.createOffer()
+                    await pc.setLocalDescription(offer)
                     ws.send(JSON.stringify({ type: 'offer', offer }))
                 } catch (e) {
-                    errorMessage.value = `Failed to create offer: ${e.message}`
+                    errorMessage.value = `Failed to create offer: ${getErrorMessage(e)}`
                     status.value = Status.ERROR
                 }
                 break
 
             case 'answer':
-                if (peerConnection) {
+                if (peerConnection && msg.answer) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.answer))
                 }
                 break
@@ -421,7 +471,7 @@ const connectHostWs = (isRejoin = false) => {
                 break
 
             case 'error':
-                errorMessage.value = msg.message
+                errorMessage.value = msg.message || 'Unknown signaling error'
                 status.value = Status.ERROR
                 break
         }
@@ -454,7 +504,7 @@ const connectHostWs = (isRejoin = false) => {
  * (e.g. after sharing the link via the share sheet on mobile), reconnect
  * the WebSocket to the existing room.
  */
-const addVisibilityListener = () => {
+const addVisibilityListener = (): void => {
     removeVisibilityListener()
     visibilityHandler = () => {
         if (document.visibilityState !== 'visible') return
@@ -471,7 +521,7 @@ const addVisibilityListener = () => {
     document.addEventListener('visibilitychange', visibilityHandler)
 }
 
-const removeVisibilityListener = () => {
+const removeVisibilityListener = (): void => {
     if (visibilityHandler) {
         document.removeEventListener('visibilitychange', visibilityHandler)
         visibilityHandler = null
@@ -481,7 +531,7 @@ const removeVisibilityListener = () => {
 /**
  * HOST: Create a room and wait for a peer to connect.
  */
-const startHosting = () => {
+const startHosting = (): void => {
     reset()
     syncDirection.value = 'send'
     status.value = Status.CREATING_ROOM
@@ -493,7 +543,7 @@ const startHosting = () => {
 /**
  * HOST: Resume hosting an existing room (e.g. after returning to the page).
  */
-const resumeHosting = (existingRoomId) => {
+const resumeHosting = (existingRoomId: string): void => {
     syncDirection.value = 'send'
     roomId.value = existingRoomId
     status.value = Status.WAITING_FOR_PEER
@@ -506,7 +556,7 @@ const resumeHosting = (existingRoomId) => {
 /**
  * GUEST: Join an existing room by roomId.
  */
-const joinRoom = (targetRoomId) => {
+const joinRoom = (targetRoomId: string): void => {
     reset()
     syncDirection.value = 'receive'
     status.value = Status.JOINING_ROOM
@@ -515,11 +565,13 @@ const joinRoom = (targetRoomId) => {
     ws = new WebSocket(getWsUrl())
 
     ws.onopen = () => {
+        if (!ws) return
         ws.send(JSON.stringify({ type: 'join-room', roomId: targetRoomId }))
     }
 
     ws.onmessage = async (event) => {
-        const msg = JSON.parse(event.data)
+        if (typeof event.data !== 'string') return
+        const msg = parseSignalingMessage(event.data)
 
         switch (msg.type) {
             case 'room-joined':
@@ -528,11 +580,13 @@ const joinRoom = (targetRoomId) => {
                 break
 
             case 'offer':
-                if (peerConnection) {
+                if (peerConnection && msg.offer) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.offer))
                     const answer = await peerConnection.createAnswer()
                     await peerConnection.setLocalDescription(answer)
-                    ws.send(JSON.stringify({ type: 'answer', answer }))
+                    if (ws) {
+                        ws.send(JSON.stringify({ type: 'answer', answer }))
+                    }
                 }
                 break
 
@@ -555,7 +609,7 @@ const joinRoom = (targetRoomId) => {
                 break
 
             case 'error':
-                errorMessage.value = msg.message
+                errorMessage.value = msg.message || 'Unknown signaling error'
                 status.value = Status.ERROR
                 break
         }
@@ -577,7 +631,7 @@ const joinRoom = (targetRoomId) => {
 /**
  * Generate the one-time sync link for the current room.
  */
-const getSyncLink = computed(() => {
+const getSyncLink = computed<string>(() => {
     if (!roomId.value) return ''
     const base = window.location.origin + window.location.pathname
     return `${base}?sync=${roomId.value}`
@@ -586,23 +640,23 @@ const getSyncLink = computed(() => {
 /**
  * Regenerate a room (close current, create new).
  */
-const regenerateRoom = () => {
+const regenerateRoom = (): void => {
     startHosting()
 }
 
 /**
  * Open the sync overlay.
  */
-const openOverlay = () => {
+const openOverlay = (): void => {
     isOverlayOpen.value = true
 
     // Check if there's a persisted room we should resume
     const saved = sessionStorage.getItem(SESSION_KEY)
     if (saved) {
         try {
-            const { roomId: savedRoomId, direction } = JSON.parse(saved)
-            if (savedRoomId && direction === 'send') {
-                resumeHosting(savedRoomId)
+            const parsed: unknown = JSON.parse(saved)
+            if (isPersistedRoom(parsed) && parsed.direction === 'send') {
+                resumeHosting(parsed.roomId)
             }
         } catch { /* ignore */ }
     }
@@ -611,7 +665,7 @@ const openOverlay = () => {
 /**
  * Close the sync overlay and clean up.
  */
-const closeOverlay = () => {
+const closeOverlay = (): void => {
     isOverlayOpen.value = false
     // Don't reset if transfer is in progress
     if (status.value !== Status.TRANSFERRING) {
@@ -622,13 +676,13 @@ const closeOverlay = () => {
 /**
  * Try to resume a persisted room on app startup (e.g. page reload while hosting).
  */
-const tryResumeOnLoad = () => {
+const tryResumeOnLoad = (): void => {
     const saved = sessionStorage.getItem(SESSION_KEY)
     if (saved) {
         try {
-            const { roomId: savedRoomId, direction } = JSON.parse(saved)
-            if (savedRoomId && direction === 'send') {
-                resumeHosting(savedRoomId)
+            const parsed: unknown = JSON.parse(saved)
+            if (isPersistedRoom(parsed) && parsed.direction === 'send') {
+                resumeHosting(parsed.roomId)
             }
         } catch { /* ignore */ }
     }
@@ -659,6 +713,7 @@ export function useDataSync() {
         tryResumeOnLoad
     }
 }
+
 
 
 

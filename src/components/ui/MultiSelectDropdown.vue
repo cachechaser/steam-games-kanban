@@ -1,79 +1,75 @@
-<script setup>
-import {computed, nextTick, onBeforeUnmount, onMounted, onUpdated, ref} from 'vue'
+<script setup lang="ts">
+import {computed, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, toRefs} from 'vue'
+import type { CSSProperties } from 'vue'
 
-const props = defineProps({
+const MODE_OPTIONS = ['tags', 'dropdown'] as const
+type Mode = (typeof MODE_OPTIONS)[number]
+
+type OptionObject = { key: string, label: string, locked?: boolean }
+type Option = string | OptionObject
+type NormalizedOption = { key: string, label: string, locked: boolean }
+
+const props = withDefaults(defineProps<{
 	/** Array of option objects: { key: string, label: string, locked?: boolean } or plain strings */
-	options: {
-		type: Array,
-		required: true,
-	},
+	options: Option[]
 	/** Array of selected keys (strings) */
-	modelValue: {
-		type: Array,
-		required: true,
-	},
+	modelValue: string[]
 	/** Display mode: 'tags' (inline pill toggles) or 'dropdown' (button + checkbox menu) */
-	mode: {
-		type: String,
-		default: 'tags',
-		validator: v => ['tags', 'dropdown'].includes(v),
-	},
+	mode?: Mode
 	/** In dropdown mode, show selected items as removable tags instead of a plain button */
-	showTags: {
-		type: Boolean,
-		default: true,
-	},
+	showTags?: boolean
 	/** Button label shown in dropdown mode */
-	buttonLabel: {
-		type: String,
-		default: 'Select',
-	},
+	buttonLabel?: string
 	/** FontAwesome icon name for the dropdown button */
-	buttonIcon: {
-		type: String,
-		default: null,
-	},
+	buttonIcon?: string | null
 	/** Minimum number of selected items (prevents unchecking below this) */
-	minSelected: {
-		type: Number,
-		default: 0,
-	},
+	minSelected?: number
+}>(), {
+	mode: 'tags',
+	showTags: true,
+	buttonLabel: 'Select',
+	buttonIcon: null,
+	minSelected: 0,
 })
 
-const emit = defineEmits(['update:modelValue'])
+const { mode, showTags, buttonLabel, buttonIcon } = toRefs(props)
+
+const emit = defineEmits<{
+	(e: 'update:modelValue', value: string[]): void
+}>()
 
 const dropdownOpen = ref(false)
-const triggerEl = ref(null)
-const menuStyle = ref({})
+const triggerEl = ref<HTMLElement | null>(null)
+const menuStyle = ref<CSSProperties>({})
 
 /** Normalize an option to { key, label, locked } */
-const normalize = (opt) => {
+const normalize = (opt: Option): NormalizedOption => {
 	if (typeof opt === 'string') return {key: opt, label: opt, locked: false}
 	return {key: opt.key, label: opt.label, locked: !!opt.locked}
 }
 
 /** Options with locked filtered out for display */
-const displayOptions = computed(() => {
+const displayOptions = computed<Option[]>(() => {
 	return props.options.filter(o => !normalize(o).locked)
 })
 
-const isSelected = (key) => props.modelValue.includes(key)
+const isSelected = (key: string): boolean => props.modelValue.includes(key)
 
-const isDisabled = (opt) => {
+const isDisabled = (opt: Option) => {
 	const n = normalize(opt)
 	if (n.locked) return true
 	return isSelected(n.key) && props.modelValue.length <= props.minSelected
 }
 
 /** Selected options as normalized objects, preserving modelValue order (excluding locked) */
-const selectedOptions = computed(() => {
+const selectedOptions = computed<NormalizedOption[]>(() => {
 	return props.modelValue
 		.map(key => props.options.find(o => normalize(o).key === key))
 		.filter(o => o && !normalize(o).locked)
 		.map(normalize)
 })
 
-const toggle = (opt) => {
+const toggle = (opt: Option) => {
 	const n = normalize(opt)
 	if (isDisabled(opt)) return
 
@@ -112,22 +108,22 @@ const closeDropdown = () => {
 	dropdownOpen.value = false
 }
 
-const tagsContainerEl = ref(null)
-let resizeObserver = null
+const tagsContainerEl = ref<HTMLElement | null>(null)
+let resizeObserver: ResizeObserver | null = null
 
 const hideOverflowingTags = () => {
 	const container = tagsContainerEl.value
 	const trigger = triggerEl.value
 	if (!container || !trigger) return
 
-	const tags = container.querySelectorAll('.col-tag')
+	const tags = container.querySelectorAll<HTMLElement>('.col-tag')
 	if (!tags.length) return
 	tags.forEach(t => t.style.display = 'none')
 	
 	const parentEl = trigger.closest('.tag-dropdown')?.parentElement
 	const maxWidth = parentEl ? parentEl.clientWidth : trigger.clientWidth
 
-	const rightEl = trigger.querySelector('.tag-dropdown-right')
+	const rightEl = trigger.querySelector('.tag-dropdown-right') as HTMLElement
 	const rightWidth = rightEl ? rightEl.offsetWidth : 60
 	const availableWidth = maxWidth - rightWidth - 26
 

@@ -1,4 +1,5 @@
 import {ref} from 'vue'
+import type { SteamGame } from '@/types/domain'
 
 /**
  * Composable for the game info modal open/close logic.
@@ -6,9 +7,9 @@ import {ref} from 'vue'
  */
 export function useGameInfoModal() {
 	const showGameInfo = ref(false)
-	const selectedGame = ref(null)
+	const selectedGame = ref<SteamGame | null>(null)
 
-	const openGameInfo = (game) => {
+	const openGameInfo = (game: SteamGame) => {
 		selectedGame.value = game
 		showGameInfo.value = true
 	}
@@ -19,4 +20,5 @@ export function useGameInfoModal() {
 
 	return {showGameInfo, selectedGame, openGameInfo, closeGameInfo}
 }
+
 

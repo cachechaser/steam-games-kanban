@@ -5,7 +5,7 @@
  * @param {string} text
  * @returns {Promise<boolean>}
  */
-export async function copyToClipboard(text) {
+export async function copyToClipboard(text: string): Promise<boolean> {
     // Try the modern Clipboard API first
     if (navigator.clipboard?.writeText) {
         try {
@@ -28,6 +28,9 @@ export async function copyToClipboard(text) {
         document.body.appendChild(textarea)
         textarea.focus()
         textarea.select()
+        
+        // eslint-disable-next-line
+        // noinspection JSDeprecatedSymbols
         const ok = document.execCommand('copy')
         document.body.removeChild(textarea)
         return ok
@@ -35,4 +38,5 @@ export async function copyToClipboard(text) {
         return false
     }
 }
+
 

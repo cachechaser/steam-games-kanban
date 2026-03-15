@@ -7,8 +7,12 @@
     "dev": "vite",
     "dev-host": "vite --host",
     "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "vue-tsc --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.server.json --noEmit",
     "preview": "vite preview",
-    "serve": "node server.js"
+    "serve": "tsx server.ts"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
@@ -24,10 +28,23 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.6.0",
+    "@types/supertest": "^7.2.0",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-vue": "^6.0.3",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^26.1.0",
     "sass-embedded": "^1.97.3",
+    "supertest": "^7.1.4",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
     "vite": "^7.3.1",
-    "vite-plugin-vue-devtools": "^8.0.5"
+    "vite-plugin-vue-devtools": "^8.0.5",
+    "vitest": "^3.2.4",
+    "vue-tsc": "^3.1.1"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

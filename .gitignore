@@ -400,5 +400,9 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+
+### Misc
 dist.zip
 /qodana.yaml
+*.zip

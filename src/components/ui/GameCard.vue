@@ -1,19 +1,30 @@
-<script setup>
+<script setup lang="ts">
 import HideIcon from '../icons/HideIcon.vue'
-import InfoIcon from "@/components/icons/InfoIcon.vue";
+import InfoIcon from '@/components/icons/InfoIcon.vue'
+import type { CompletionData, SteamGame } from '@/types/domain'
+import { DEFAULT_COLUMN_COLOR } from '@/types/board'
 
-const props = defineProps({
-	game: {type: Object, required: true},
-	completionData: {type: Object, required: true},
-	columnColor: {type: String, default: '#66c0f4'},
-	draggable: {type: Boolean, default: false},
-	loadingDetails: {type: Boolean, default: false},
-	isDuplicate: {type: Boolean, default: false}
+const props = withDefaults(defineProps<{
+	game: SteamGame
+	completionData: CompletionData
+	columnColor?: string
+	draggable?: boolean
+	loadingDetails?: boolean
+	isDuplicate?: boolean
+}>(), {
+	columnColor: DEFAULT_COLUMN_COLOR,
+	draggable: false,
+	loadingDetails: false,
+	isDuplicate: false
 })
 
-const emit = defineEmits(['info', 'hide', 'load-stats'])
+const emit = defineEmits<{
+	(e: 'info', game: SteamGame): void
+	(e: 'hide', game: SteamGame): void
+	(e: 'load-stats', game: SteamGame): void
+}>()
 
-const gameIconUrl = (game) => {
+const gameIconUrl = (game: SteamGame): string => {
 	if (!game.img_icon_url) return '//placehold.co/64x64'
 	return `//media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
 }

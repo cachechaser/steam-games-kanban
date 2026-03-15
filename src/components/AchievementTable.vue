@@ -1,36 +1,29 @@
-<script setup>
+<script setup lang="ts">
 import InfoIcon from './icons/InfoIcon.vue'
+import { DEFAULT_VISIBLE_COLUMNS } from '@/types/achievementTable'
+import type { AchievementTableRow, SortField, VisibleColumn } from '@/types/achievementTable'
 
-const props = defineProps({
-	achievements: {
-		type: Array,
-		required: true
-	},
-	loading: {
-		type: Boolean,
-		default: false
-	},
-	showGameColumn: {
-		type: Boolean,
-		default: true
-	},
-	visibleColumns: {
-		type: Array,
-		default: () => ['game', 'achievement', 'unlockRate', 'unlockDate']
-	},
-	sortBy: {
-		type: String,
-		default: ''
-	},
-	sortDesc: {
-		type: Boolean,
-		default: true
-	}
+const props = withDefaults(defineProps<{
+	achievements: AchievementTableRow[]
+	loading?: boolean
+	showGameColumn?: boolean
+	visibleColumns?: VisibleColumn[]
+	sortBy?: SortField
+	sortDesc?: boolean
+}>(), {
+	loading: false,
+	showGameColumn: true,
+	visibleColumns: () => [...DEFAULT_VISIBLE_COLUMNS],
+	sortBy: '',
+	sortDesc: true
 })
 
-const emit = defineEmits(['sort', 'game-click'])
+const emit = defineEmits<{
+	(e: 'sort', field: SortField): void
+	(e: 'game-click', achievement: AchievementTableRow): void
+}>()
 
-const isVisible = (key) => props.visibleColumns.includes(key)
+const isVisible = (key: VisibleColumn): boolean => props.visibleColumns.includes(key)
 
 const colCount = () => {
 	let count = 0
@@ -45,22 +38,22 @@ const colCount = () => {
 	return count || 1
 }
 
-const handleSort = (field) => {
+const handleSort = (field: SortField): void => {
 	emit('sort', field)
 }
 
-const onGameClick = (ach) => {
+const onGameClick = (ach: AchievementTableRow): void => {
 	emit('game-click', ach)
 }
 
-const getIconUrl = (ach) => {
+const getIconUrl = (ach: AchievementTableRow): string => {
 	const url = ach.achieved ? ach.icon : (ach.iconGray || ach.icongray)
 	if (!url) return ''
 	if (url.startsWith('http')) return url
 	return `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${ach.appid}/${url}.jpg`
 }
 
-const formatPlaytime = (minutes) => {
+const formatPlaytime = (minutes?: number): string => {
 	if (!minutes) return '0h'
 	if (minutes < 60) return `${minutes}m`
 	return `${(minutes / 60).toFixed(1)}h`

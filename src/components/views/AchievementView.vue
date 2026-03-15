@@ -1,11 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import {ref, computed, watch} from 'vue'
 import GameInfoComponent from '../GameInfoComponent.vue'
 import AchievementTable from '../AchievementTable.vue'
 import MultiSelectDropdown from '../ui/MultiSelectDropdown.vue'
 import ViewHeader from "@/components/ui/ViewHeader.vue";
-import {useGameInfoModal} from "@/composables/useGameInfoModal.js";
-import {useStatsAutoLoad} from "@/composables/useStatsAutoLoad.js";
+import {useGameInfoModal} from "@/composables/useGameInfoModal";
+import {useStatsAutoLoad} from "@/composables/useStatsAutoLoad";
+import {ACHIEVEMENT_TABLE_COLUMNS, DEFAULT_VISIBLE_COLUMNS} from '@/types/achievementTable'
+import type {SortField, TableColumnOption, VisibleColumn} from '@/types/achievementTable'
 
 const {showGameInfo, selectedGame, openGameInfo, closeGameInfo} = useGameInfoModal()
 const {state, refreshLibrary, getCompletionData} = useStatsAutoLoad()
@@ -18,7 +20,7 @@ const achievementsPerPage = 50
 const filterLocked = ref('all')
 const filterPlayedOnly = ref(false)
 const filterColumns = ref([])
-const sortBy = ref('unlockRate')
+const sortBy = ref<SortField>('unlockRate')
 const sortDesc = ref(true)
 const gameSearch = ref('')
 const rarityMin = ref(0)
@@ -26,21 +28,12 @@ const rarityMax = ref(100)
 const showFilters = ref(false)
 
 // Column visibility
-const allTableColumns = [
-	{key: 'game', label: 'Game', default: true},
-	{key: 'achievement', label: 'Achievement', default: true, locked: true},
-	{key: 'rarityTier', label: 'Rarity Tier', default: false},
-	{key: 'unlockRate', label: 'Global %', default: true},
-	{key: 'avgGlobalRarity', label: 'Avg. Global Rarity', default: false},
-	{key: 'gameCompletion', label: 'Game Completion', default: false},
-	{key: 'playtime', label: 'Playtime', default: false},
-	{key: 'unlockDate', label: 'Unlock Date', default: true},
-]
-const visibleColumns = ref(allTableColumns.filter(c => c.default).map(c => c.key))
+const allTableColumns: TableColumnOption[] = ACHIEVEMENT_TABLE_COLUMNS
+const visibleColumns = ref<VisibleColumn[]>([...DEFAULT_VISIBLE_COLUMNS])
 
 
 // Rarity tier helper
-const getRarityTier = (pct) => {
+const getRarityTier = (pct: number) => {
 	if (pct <= 5) return {label: 'Ultra Rare', color: '#ffc83d'}
 	if (pct <= 15) return {label: 'Rare', color: '#be5eff'}
 	if (pct <= 35) return {label: 'Uncommon', color: '#66c0f4'}
@@ -205,7 +198,7 @@ const activeFilterCount = computed(() => {
 })
 
 // Methods
-const handleSort = (field) => {
+const handleSort = (field: SortField) => {
 	if (sortBy.value === field) {
 		sortDesc.value = !sortDesc.value
 	} else {
@@ -214,7 +207,7 @@ const handleSort = (field) => {
 	}
 }
 
-const goToPage = (page) => {
+const goToPage = (page: number) => {
 	if (page >= 1 && page <= totalPages.value) {
 		currentPage.value = page
 	}
@@ -230,7 +223,7 @@ const clearFilters = () => {
 	rarityMax.value = 100
 }
 
-const openGameInfoFromAch = (ach) => {
+const openGameInfoFromAch = (ach: { appid: number; }) => {
 	const game = state.games.find(g => g.appid === ach.appid)
 	if (game) {
 		openGameInfo(game)
@@ -269,7 +262,7 @@ watch([filterLocked, filterPlayedOnly, filterColumns, gameSearch, rarityMin, rar
 						<span v-if="activeFilterCount > 0" class="filter-badge">{{ activeFilterCount }}</span>
 					</button>
 					<button
-							@click="refreshLibrary"
+							@click="() => refreshLibrary()"
 							:disabled="state.loading"
 							class="btn btn-secondary reload-btn"
 					>
@@ -360,10 +353,10 @@ watch([filterLocked, filterPlayedOnly, filterColumns, gameSearch, rarityMin, rar
 		<AchievementTable
 				:achievements="paginatedAchievements"
 				:loading="state.loading"
-				:sort-by="sortBy"
+				:sort-by="sortBy as SortField"
 				:sort-desc="sortDesc"
 				:show-game-column="visibleColumns.includes('game')"
-				:visible-columns="visibleColumns"
+				:visible-columns="visibleColumns as VisibleColumn[]"
 				@sort="handleSort"
 				@game-click="openGameInfoFromAch"
 		/>

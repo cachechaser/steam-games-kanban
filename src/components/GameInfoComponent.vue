@@ -1,35 +1,44 @@
-<script setup>
+<script setup lang="ts">
 import {computed, ref} from 'vue'
-import {useSteam} from '../composables/useSteam'
+import {useSteam} from '@/composables/useSteam'
 import AchievementTable from './AchievementTable.vue'
 import GameIconImg from './ui/GameIconImg.vue'
 import MultiSelectDropdown from './ui/MultiSelectDropdown.vue'
 import BaseOverlay from './ui/BaseOverlay.vue'
+import type {SteamGame} from '@/types/domain'
+import type {AchievementTableRow, SortField} from '@/types/achievementTable'
 
-const props = defineProps({
-	game: Object,
-	isOpen: Boolean
+const props = withDefaults(defineProps<{
+	game: SteamGame | null
+	isOpen: boolean
+}>(), {
+	game: null,
+	isOpen: false,
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits<{
+	(e: 'close'): void
+}>()
 
 const {getCompletionData, state, copyGameToColumn, removeGameFromColumn, getGameColumns} = useSteam()
+const selectedGame = computed<SteamGame | null>(() => props.game)
 
-const sortBy = ref('unlockRate')
+const sortBy = ref<SortField>('unlockRate')
 const sortDesc = ref(true)
 
-const handleSort = (field) => {
+const handleSort = (field: SortField): void => {
 	if (sortBy.value === field) {
 		sortDesc.value = !sortDesc.value
 	} else {
 		sortBy.value = field
-		sortDesc.value = field !== 'achName';
+		sortDesc.value = field !== 'achName'
 	}
 }
 
-const stats = computed(() => {
-	if (!props.game) return {total: 0, achieved: 0}
-	return getCompletionData(props.game)
+const stats = computed<{ total: number; achieved: number }>(() => {
+	const game = selectedGame.value
+	if (!game) return {total: 0, achieved: 0}
+	return getCompletionData(game)
 })
 
 const completionPercentage = computed(() => {
@@ -37,49 +46,53 @@ const completionPercentage = computed(() => {
 	return Math.round((stats.value.achieved / stats.value.total) * 100)
 })
 
-const averageGlobal = computed(() => {
-	if (!props.game?.achievementsList?.achievements?.length) return 0
-	const total = props.game.achievementsList.achievements.reduce((acc, ach) => acc + (ach.unlockPercentage || 0), 0)
-	return (total / props.game.achievementsList.achievements.length).toFixed(1)
+const averageGlobal = computed<string>(() => {
+	const game = selectedGame.value
+	if (!game?.achievementsList?.achievements?.length) return '0.0'
+	const total = game.achievementsList.achievements.reduce((acc, ach) => acc + (ach.unlockPercentage || 0), 0)
+	return (total / game.achievementsList.achievements.length).toFixed(1)
 })
 
-const allColumnNames = computed(() => {
+const allColumnNames = computed<string[]>(() => {
 	return state.columns.map(c => typeof c === 'string' ? c : c.name)
 })
 
-const gameColumns = computed(() => {
-	if (!props.game) return []
-	return getGameColumns(props.game)
+const gameColumns = computed<string[]>(() => {
+	const game = selectedGame.value
+	if (!game) return []
+	return getGameColumns(game)
 })
 
-const updateGameColumns = (newColumns) => {
-	if (!props.game) return
+const updateGameColumns = (newColumns: string[]): void => {
+	const game = selectedGame.value
+	if (!game) return
 	const current = gameColumns.value
 	// Add new columns
 	for (const col of newColumns) {
 		if (!current.includes(col)) {
-			copyGameToColumn(props.game, col)
+			copyGameToColumn(game, col)
 		}
 	}
 	// Remove unchecked columns
 	for (const col of current) {
 		if (!newColumns.includes(col)) {
-			removeGameFromColumn(props.game, col)
+			removeGameFromColumn(game, col)
 		}
 	}
 }
 
-const sortedAchievements = computed(() => {
-	if (!props.game?.achievementsList?.achievements) return []
+const sortedAchievements = computed<AchievementTableRow[]>(() => {
+	const game = selectedGame.value
+	if (!game?.achievementsList?.achievements) return []
 
-	const list = [...props.game.achievementsList.achievements].map(ach => ({
+	const list: AchievementTableRow[] = [...game.achievementsList.achievements].map(ach => ({
 		...ach,
-		appid: props.game.appid,
-		gameName: props.game.name
+		appid: game.appid,
+		gameName: game.name
 	}))
 
 	list.sort((a, b) => {
-		let cmp
+		let cmp: number
 		switch (sortBy.value) {
 			case 'achName':
 				cmp = (a.name || '').localeCompare(b.name || '')
@@ -108,18 +121,18 @@ const close = () => {
 </script>
 
 <template>
-	<BaseOverlay :show="isOpen && !!game" max-width="900px" :padded="false" @close="close">
+	<BaseOverlay :show="isOpen && !!selectedGame" max-width="900px" :padded="false" @close="close">
 		<!-- Header -->
 		<template #header>
 			<div class="modal-header-custom">
 				<GameIconImg
-						:appid="game.appid"
-						:icon-hash="game.img_icon_url"
+						:appid="selectedGame?.appid || 0"
+						:icon-hash="selectedGame?.img_icon_url"
 						size="large"
 						class="game-icon-large"
 				/>
 				<div class="header-text">
-					<h2>{{ game.name }}</h2>
+					<h2>{{ selectedGame?.name }}</h2>
 					<div class="badges">
 						<!-- Checkbox dropdown -->
 						<MultiSelectDropdown
@@ -132,7 +145,7 @@ const close = () => {
 								button-icon="grip-vertical"
 								:min-selected="1"
 						/>
-						<span class="playtime-badge"><font-awesome-icon icon="clock" /> {{ (game.playtime_forever / 60).toFixed(1) }}h</span>
+						<span class="playtime-badge"><font-awesome-icon icon="clock" /> {{ (((selectedGame?.playtime_forever) || 0) / 60).toFixed(1) }}h</span>
 					</div>
 				</div>
 			</div>
@@ -164,7 +177,7 @@ const close = () => {
 			<AchievementTable
 					:achievements="sortedAchievements"
 					:show-game-column="false"
-					:sort-by="sortBy"
+					:sort-by="sortBy as SortField"
 					:sort-desc="sortDesc"
 					@sort="handleSort"
 			/>

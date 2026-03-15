@@ -1,14 +1,20 @@
 import crypto from 'node:crypto'
+import type { WebSocket, WebSocketServer } from 'ws'
 
 /**
  * Attach WebRTC signaling logic to a WebSocketServer instance.
  * Shared between the Vite dev plugin and the production Express server.
  *
- * @param {import('ws').WebSocketServer} wss
  */
-export function attachSignaling(wss) {
-    /** @type {Map<string, { host: import('ws')|null, guest: import('ws')|null, createdAt: number }>} */
-    const rooms = new Map()
+export function attachSignaling(wss: WebSocketServer): void {
+    type Role = 'host' | 'guest'
+    type SignalMessage = {
+        type: 'create-room' | 'rejoin-room' | 'join-room' | 'offer' | 'answer' | 'ice-candidate' | 'sync-complete'
+        roomId?: string
+        [key: string]: unknown
+    }
+
+    const rooms = new Map<string, { host: WebSocket | null, guest: WebSocket | null, createdAt: number }>()
 
     // Cleanup stale rooms every 5 minutes
     setInterval(() => {
@@ -23,12 +29,16 @@ export function attachSignaling(wss) {
     }, 5 * 60 * 1000)
 
     wss.on('connection', (ws) => {
-        let assignedRoom = null
-        let role = null
+        let assignedRoom: string | null = null
+        let role: Role | null = null
 
         ws.on('message', (raw) => {
-            let msg
-            try { msg = JSON.parse(raw) } catch { return }
+            let msg: SignalMessage
+            try {
+                msg = JSON.parse(String(raw)) as SignalMessage
+            } catch {
+                return
+            }
 
             switch (msg.type) {
                 case 'create-room': {
@@ -121,4 +131,5 @@ export function attachSignaling(wss) {
         })
     })
 }
+
 

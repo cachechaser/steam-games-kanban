@@ -1,10 +1,20 @@
-<script setup>
+<script setup lang="ts">
 import {ref, computed, onMounted, watch} from "vue";
-import {useSteam} from "@/composables/useSteam.js";
-import {useSteamLogin} from "@/composables/useSteamLogin.js";
-import {copyToClipboard} from "@/utils/clipboard.js";
+import {useSteam} from "@/composables/useSteam";
+import {useSteamLogin} from "@/composables/useSteamLogin";
+import {copyToClipboard} from "@/utils/clipboard";
 import GameIconImg from "../ui/GameIconImg.vue";
 import {FontAwesomeIcon} from "@fortawesome/vue-fontawesome";
+import { CollectionImportPayload, SteamGame} from "@/types/domain";
+
+type ImportMode = 'add' | 'replace';
+type ImportResult = {
+	columnsCreated: string[];
+	columnsRemoved: string[];
+	gamesMoved: number;
+	gamesReset: number;
+	gamesNotFound: number;
+};
 
 const {
 	state,
@@ -27,8 +37,8 @@ const showHiddenOnly = ref(false);
 
 const importJson = ref("");
 const importOnlyUnassigned = ref(false);
-const importMode = ref("add"); // 'add' | 'replace'
-const importResult = ref(null);
+const importMode = ref<ImportMode>("add");
+const importResult = ref<ImportResult | null>(null);
 const importError = ref(null);
 const importLoading = ref(false);
 
@@ -64,9 +74,9 @@ const currentConfig = computed(() => OS_CONFIG[selectedOS.value]);
 const isSetupIncomplete = computed(() => !state.hasServerApiKey && !state.apiKey?.trim());
 const apiKeyError = computed(() => state.error || "");
 const advancedSummaryText = computed(() =>
-	state.hasServerApiKey
-		? "Advanced: Optional Overrides (ID / API Key)"
-		: "Advanced: Set ID Manually",
+		state.hasServerApiKey
+				? "Advanced: Optional Overrides (ID / API Key)"
+				: "Advanced: Set ID Manually",
 );
 
 const copyCommand = async () => {
@@ -113,11 +123,11 @@ const filteredGames = computed(() => {
 	return result;
 });
 
-const toggleHide = (game) => {
+const toggleHide = (game: SteamGame) => {
 	toggleGameVisibility(game);
 };
 
-const toggleAllHidden = (hidden) => {
+const toggleAllHidden = (hidden: boolean) => {
 	if (confirm(`Set ALL filtered games to ${hidden ? "Hidden" : "Visible"}?`)) {
 		setGamesVisibility(filteredGames.value, hidden);
 	}
@@ -129,7 +139,7 @@ const handleImportCollections = async () => {
 	importLoading.value = true;
 
 	try {
-		let data;
+		let data: CollectionImportPayload;
 		try {
 			data = JSON.parse(importJson.value);
 		} catch {
@@ -152,22 +162,28 @@ const handleImportCollections = async () => {
 			}
 		}
 
-		importResult.value = importCollections(data, importMode.value, importOnlyUnassigned.value);
+		importResult.value = await importCollections(data, importMode.value, importOnlyUnassigned.value);
 		importJson.value = "";
 	} catch (e) {
-		importError.value = e.message;
+		importError.value = e instanceof Error ? e.message : String(e);
 	} finally {
 		importLoading.value = false;
 	}
 };
 
-const handleFileUpload = (event) => {
-	const file = event.target.files[0];
+const handleFileUpload = (event: Event) => {
+	const input = event.target as HTMLInputElement | null;
+	const file = input?.files?.[0];
 	if (!file) return;
 
 	const reader = new FileReader();
 	reader.onload = (e) => {
-		importJson.value = e.target.result;
+		const result = e.target?.result;
+		if (typeof result === 'string') {
+			importJson.value = result;
+		} else {
+			importError.value = 'Failed to read file as text.';
+		}
 	};
 	reader.onerror = () => {
 		importError.value = "Failed to read file.";

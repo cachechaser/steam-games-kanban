@@ -1,9 +1,15 @@
-<script setup>
-defineProps({
-	name: {type: String, required: true},
-	color: {type: String, default: '#66c0f4'},
-	count: {type: Number, default: 0},
-	status: {type: String, default: ''}
+<script setup lang="ts">
+import { DEFAULT_COLUMN_COLOR } from '@/types/board'
+
+withDefaults(defineProps<{
+	name: string
+	color?: string
+	count?: number
+	status?: string
+}>(), {
+	color: DEFAULT_COLUMN_COLOR,
+	count: 0,
+	status: ''
 })
 </script>
 

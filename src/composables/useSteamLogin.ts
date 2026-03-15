@@ -3,7 +3,7 @@
  * Centralizes the loginWithSteam redirect logic used in NavBar, HomeView, and ProfileEditView.
  */
 export function useSteamLogin() {
-	const loginWithSteam = (returnHash = '') => {
+	const loginWithSteam = (returnHash: string | unknown = '') => {
 		// Vue click handlers pass PointerEvent when no args are supplied.
 		const normalizedReturnHash = typeof returnHash === 'string' ? returnHash : ''
 		const baseUrl = window.location.href.split('#')[0]
@@ -24,4 +24,5 @@ export function useSteamLogin() {
 
 	return {loginWithSteam}
 }
+
 

@@ -61,6 +61,24 @@ npm run dev
 npm run build
 ```
 
+#### Run Test Suite
+
+```sh
+npm test
+```
+
+#### Run Tests in Watch Mode
+
+```sh
+npm run test:watch
+```
+
+#### Run Test Coverage
+
+```sh
+npm run test:coverage
+```
+
 ---
 
 ## Roadmap and Next Steps

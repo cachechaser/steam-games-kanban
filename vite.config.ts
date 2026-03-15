@@ -3,7 +3,9 @@ import {fileURLToPath, URL} from 'node:url'
 import {defineConfig} from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
-import {attachSignaling} from './lib/signaling.js'
+import {attachSignaling} from './lib/signaling'
+import { IncomingMessage } from "http"
+import { Duplex } from "stream"
 
 /**
  * Vite plugin that runs the WebRTC signaling WebSocket server
@@ -14,13 +16,13 @@ function wsSignalingPlugin() {
 
     return {
         name: 'ws-signaling',
-        [configureServerHook]: (server) => {
+        [configureServerHook]: (server: { httpServer: { on: (arg0: string, arg1: (req: IncomingMessage, socket: Duplex, head: Buffer<ArrayBufferLike>) => void) => void } }) => {
             // Lazy-import ws only when the dev server starts
             import('ws').then(({WebSocketServer}) => {
                 const wss = new WebSocketServer({noServer: true})
 
                 // Intercept upgrade requests for /ws/signal
-                server.httpServer.on('upgrade', (req, socket, head) => {
+                server.httpServer.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer<ArrayBufferLike>) => {
                     if (req.url === '/ws/signal') {
                         wss.handleUpgrade(req, socket, head, (ws) => {
                             wss.emit('connection', ws, req)
@@ -59,3 +61,4 @@ export default defineConfig({
         }
     }
 })
+

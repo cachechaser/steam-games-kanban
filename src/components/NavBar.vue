@@ -1,15 +1,15 @@
-<script setup>
-import {useSteam} from '../composables/useSteam'
-import {useSteamLogin} from '../composables/useSteamLogin'
-import {useRouter} from '../router'
-import {useDataSync} from '../composables/useDataSync'
+<script setup lang="ts">
+import {useSteam} from '@/composables/useSteam'
+import {useSteamLogin} from '@/composables/useSteamLogin'
+import {useRouter} from '@/router'
+import {useDataSync} from '@/composables/useDataSync'
 
 const {currentView, navigate} = useRouter()
 const {state} = useSteam()
 const {loginWithSteam} = useSteamLogin()
 const {openOverlay, isOverlayOpen} = useDataSync()
 
-const isActive = (viewName) => {
+const isActive = (viewName: string) => {
 	return currentView.value === viewName
 }
 
@@ -153,7 +153,7 @@ const handleSyncClick = () => {
 	border: none;
 	cursor: pointer;
 	text-decoration: none;
-	font-weight: 500;
+	font-weight: 600;
 	padding: 8px 12px;
 	border-radius: 4px;
 	transition: all 0.3s ease;

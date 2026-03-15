@@ -1,9 +1,10 @@
-<script setup>
+<script setup lang="ts">
 import {ref} from 'vue'
-import {useDataSync} from '../composables/useDataSync'
-import {copyToClipboard} from '@/utils/clipboard.js'
+import {useDataSync} from '@/composables/useDataSync'
+import {copyToClipboard} from '@/utils/clipboard'
 import QRCodeVue3 from 'qrcode-vue3'
 import BaseOverlay from './ui/BaseOverlay.vue'
+import {SYNC_STATUS_ICONS, SYNC_STATUS_LABELS} from '@/types/sync'
 
 const {
 	status, roomId, errorMessage, progress, syncDirection, syncLink,
@@ -56,31 +57,17 @@ const handleRegenerate = () => {
 	regenerateRoom()
 }
 
+const selectSyncLinkInput = (event: MouseEvent) => {
+	const target = event.target
+	if (target instanceof HTMLInputElement) {
+		target.select()
+	}
+}
+
 const reloadPage = () => {
 	window.location.reload()
 }
 
-const statusLabel = {
-	[Status.IDLE]: 'Ready',
-	[Status.CREATING_ROOM]: 'Creating room…',
-	[Status.WAITING_FOR_PEER]: 'Waiting for other device…',
-	[Status.JOINING_ROOM]: 'Joining room…',
-	[Status.CONNECTING]: 'Establishing connection…',
-	[Status.TRANSFERRING]: 'Transferring data…',
-	[Status.COMPLETE]: 'Sync complete!',
-	[Status.ERROR]: 'Error',
-}
-
-const statusIcon = {
-	[Status.IDLE]: 'satellite-dish',
-	[Status.CREATING_ROOM]: 'spinner',
-	[Status.WAITING_FOR_PEER]: 'mobile-screen-button',
-	[Status.JOINING_ROOM]: 'link',
-	[Status.CONNECTING]: 'handshake',
-	[Status.TRANSFERRING]: 'box',
-	[Status.COMPLETE]: 'circle-check',
-	[Status.ERROR]: 'xmark',
-}
 </script>
 
 <template>
@@ -93,9 +80,9 @@ const statusIcon = {
 		</template>
 
 		<!-- Status Bar -->
-		<div class="status-bar" :class="status">
-			<span class="status-icon"><font-awesome-icon :icon="statusIcon[status]" :spin="status === Status.CREATING_ROOM" /></span>
-			<span class="status-text">{{ statusLabel[status] }}</span>
+		<div class="status-bar" :data-status="status">
+			<span class="status-icon"><font-awesome-icon :icon="SYNC_STATUS_ICONS[status]" :spin="status === Status.CREATING_ROOM" /></span>
+			<span class="status-text">{{ SYNC_STATUS_LABELS[status] }}</span>
 		</div>
 
 		<!-- Error Message -->
@@ -169,7 +156,7 @@ const statusIcon = {
 							:value="syncLink"
 							readonly
 							class="input-field link-input"
-							@click="$event.target.select()"
+							@click="selectSyncLinkInput"
 					/>
 					<button
 							class="btn btn-secondary copy-link-btn"
@@ -259,12 +246,24 @@ const statusIcon = {
 	font-size: 0.9rem;
 }
 
-.status-bar.complete {
+.status-bar[data-status='complete'] {
 	background: rgba(76, 175, 80, 0.15);
+	border-bottom-color: rgba(76, 175, 80, 0.35);
 }
 
-.status-bar.error {
+.status-bar[data-status='error'] {
 	background: rgba(244, 67, 54, 0.15);
+	border-bottom-color: rgba(244, 67, 54, 0.35);
+}
+
+.status-bar[data-status='complete'] .status-icon,
+.status-bar[data-status='complete'] .status-text {
+	color: #7ed589;
+}
+
+.status-bar[data-status='error'] .status-icon,
+.status-bar[data-status='error'] .status-text {
+	color: #ff7b75;
 }
 
 .status-icon {

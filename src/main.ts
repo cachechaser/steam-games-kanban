@@ -1,6 +1,7 @@
 import './assets/global.scss'
 
 import { createApp } from 'vue'
+import type { DirectiveBinding } from 'vue'
 import App from './App.vue'
 
 /* FontAwesome */
@@ -15,7 +16,7 @@ import {
 	faLock, faClock, faChevronDown, faChevronRight, faChevronUp, faPen,
 	faTableColumns, faFilter, faGripVertical, faCopy, faTrashCan
 } from '@fortawesome/free-solid-svg-icons'
-import VClickOutside from "v-click-outside/src/v-click-outside.js";
+import VClickOutside from 'v-click-outside/src/v-click-outside.js'
 
 library.add(
 	faSatelliteDish, faSpinner, faMobileScreenButton, faLink, faHandshake,
@@ -29,12 +30,13 @@ library.add(
 
 const app = createApp(App)
 app.directive(
-    "click-outside", {
-        mounted: VClickOutside.bind,
-        unmounted: VClickOutside.unbind,
-        updated: VClickOutside.updated
+	'click-outside', {
+		mounted: (el: HTMLElement, binding: DirectiveBinding, vnode) => VClickOutside.bind(el, binding, vnode),
+		unmounted: (el: HTMLElement) => VClickOutside.unbind(el),
+		updated: (el: HTMLElement, binding: DirectiveBinding, vnode) => VClickOutside.updated(el, binding, vnode)
     }
 )
 
 app.component('font-awesome-icon', FontAwesomeIcon)
 app.mount('#app')
+

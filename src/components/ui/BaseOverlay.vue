@@ -1,24 +1,19 @@
-<script setup>
-defineProps({
-	show: {
-		type: Boolean,
-		default: true
-	},
-	contentClass: {
-		type: String,
-		default: ''
-	},
-	maxWidth: {
-		type: String,
-		default: '600px'
-	},
-	padded: {
-		type: Boolean,
-		default: true
-	}
+<script setup lang="ts">
+withDefaults(defineProps<{
+	show?: boolean
+	contentClass?: string
+	maxWidth?: string
+	padded?: boolean
+}>(), {
+	show: true,
+	contentClass: '',
+	maxWidth: '600px',
+	padded: true
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits<{
+	(e: 'close'): void
+}>()
 
 const close = () => {
 	emit('close')

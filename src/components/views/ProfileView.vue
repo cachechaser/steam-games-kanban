@@ -1,7 +1,7 @@
-<script setup>
+<script setup lang="ts">
 import {computed, reactive} from 'vue'
-import {useStatsAutoLoad} from '@/composables/useStatsAutoLoad.js'
-import {useRouter} from '@/router.js'
+import {useStatsAutoLoad} from '@/composables/useStatsAutoLoad'
+import {useRouter} from '@/router'
 import GameIconImg from '../ui/GameIconImg.vue'
 import {FontAwesomeIcon} from "@fortawesome/vue-fontawesome";
 
@@ -14,21 +14,21 @@ const FALLBACK_IMG = 'https://placehold.co/600x400'
 
 
 // --- Image Handling ---
-const getHeaderUrl = (appid) => {
+const getHeaderUrl = (appid: number) => {
 	if (failedHeaders.has(appid)) return FALLBACK_IMG
 	return `https://steamcdn-a.akamaihd.net/steam/apps/${appid}/header.jpg`
 }
 
-const getPortraitUrl = (appid) => {
+const getPortraitUrl = (appid: number) => {
 	if (failedPortraits.has(appid)) return FALLBACK_IMG
 	return `https://steamcdn-a.akamaihd.net/steam/apps/${appid}/library_600x900.jpg`
 }
 
-const onHeaderError = (appid) => {
+const onHeaderError = (appid: number) => {
 	failedHeaders.add(appid)
 }
 
-const onPortraitError = (appid) => {
+const onPortraitError = (appid: number) => {
 	failedPortraits.add(appid)
 }
 

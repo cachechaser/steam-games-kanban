@@ -1,11 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import {computed} from 'vue'
-import {useStatsAutoLoad} from '@/composables/useStatsAutoLoad.js'
-import {useGameInfoModal} from '@/composables/useGameInfoModal.js'
+import {useStatsAutoLoad} from '@/composables/useStatsAutoLoad'
+import {useGameInfoModal} from '@/composables/useGameInfoModal'
 import GameInfoComponent from '../GameInfoComponent.vue'
 import GameCard from '../ui/GameCard.vue'
 import KanbanColumn from '../ui/KanbanColumn.vue'
 import ViewHeader from '../ui/ViewHeader.vue'
+import {SteamGame} from "@/types/domain";
 
 const {state, refreshLibrary, toggleGameVisibility} = useStatsAutoLoad()
 const {showGameInfo, selectedGame, openGameInfo, closeGameInfo} = useGameInfoModal()
@@ -21,7 +22,7 @@ const completionColumns = [
 
 
 // Helper to calculate percentage from the detailed list if available, or fallback to simple stats
-const getCompletionData = (game) => {
+const getCompletionData = (game: SteamGame) => {
 	// If detailed list exists
 	if (game.achievementsList && game.achievementsList.achievements) {
 		const total = game.achievementsList.achievements.length
@@ -94,7 +95,7 @@ const processedColumns = computed(() => {
 		<ViewHeader title="Completion Board">
 			<template #actions>
 				<div class="actions">
-					<button @click="refreshLibrary" :disabled="state.loading" class="btn btn-secondary reload-btn">
+					<button @click="() => refreshLibrary()" :disabled="state.loading" class="btn btn-secondary reload-btn">
 						<template v-if="state.loading">Updating Stats...</template>
 						<template v-else>
 							<font-awesome-icon icon="rotate"/>

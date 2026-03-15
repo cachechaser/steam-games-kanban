@@ -1,5 +1,5 @@
-<script setup>
-import {useSteamLogin} from '@/composables/useSteamLogin.js'
+<script setup lang="ts">
+import {useSteamLogin} from '@/composables/useSteamLogin'
 
 const {loginWithSteam} = useSteamLogin()
 </script>

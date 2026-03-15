@@ -1,4 +1,6 @@
 import {reactive, toRaw, watch} from 'vue'
+import type { CollectionImportPayload, CompletionData, SteamGame, SteamState } from '@/types/domain'
+import { BACKLOG_COLUMN, DEFAULT_BOARD_COLUMNS } from '@/types/board'
 
 const STATE_KEY = 'steam_kanban_state'
 
@@ -7,19 +9,22 @@ const DB_NAME = 'SteamKanbanDB'
 // TODO: If we need to change the structure later, we can increment this version and handle migrations in onupgradeneeded
 const DB_VERSION = 2
 
-const getDB = () => new Promise((resolve, reject) => {
+const getColumnName = (column: string | { name: string }): string =>
+    typeof column === 'string' ? column : column.name
+
+const getDB = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
     request.onerror = () => reject(request.error)
     request.onsuccess = () => resolve(request.result)
     request.onupgradeneeded = (e) => {
-        const db = e.target.result
+        const db = (e.target as IDBOpenDBRequest).result
         if (!db.objectStoreNames.contains('games')) {
             db.createObjectStore('games', {keyPath: 'appid'})
         }
     }
 })
 
-const saveGameToDB = async (game) => {
+const saveGameToDB = async (game: SteamGame): Promise<void> => {
     try {
         const db = await getDB()
         return new Promise((resolve, reject) => {
@@ -41,7 +46,7 @@ const saveGameToDB = async (game) => {
     }
 }
 
-const saveAllGamesToDB = async (games) => {
+const saveAllGamesToDB = async (games: SteamGame[]): Promise<void> => {
     try {
         const db = await getDB()
         return new Promise((resolve, reject) => {
@@ -60,7 +65,7 @@ const saveAllGamesToDB = async (games) => {
     }
 }
 
-const loadGamesFromDB = async () => {
+const loadGamesFromDB = async (): Promise<SteamGame[]> => {
     try {
         const db = await getDB()
         return new Promise((resolve, reject) => {
@@ -75,7 +80,7 @@ const loadGamesFromDB = async () => {
     }
 }
 
-const clearDB = async () => {
+const clearDB = async (): Promise<void> => {
     try {
         const db = await getDB()
         return new Promise((resolve, reject) => {
@@ -89,12 +94,12 @@ const clearDB = async () => {
     }
 }
 
-const state = reactive({
+const state = reactive<SteamState>({
     steamId: '',
     apiKey: '',
     hasServerApiKey: false,
     games: [],
-    columns: ['Backlog', 'Playing', 'Completed'],
+    columns: [...DEFAULT_BOARD_COLUMNS],
     lastUpdated: 0,
     userProfile: null,
     loading: false,
@@ -105,7 +110,7 @@ let hasLoadedServerConfig = false
 
 const hasAnyApiKey = () => Boolean((state.apiKey || '').trim() || state.hasServerApiKey)
 
-const buildSteamApiUrl = (path, params = {}) => {
+const buildSteamApiUrl = (path: string, params: Record<string, string | number | boolean | null | undefined> = {}): string => {
     const query = new URLSearchParams()
 
     Object.entries(params).forEach(([key, value]) => {
@@ -143,9 +148,9 @@ const loadServerConfig = async (force = false) => {
     }
 }
 
-const isAuthErrorStatus = (status) => status === 401 || status === 403
+const isAuthErrorStatus = (status: number): boolean => status === 401 || status === 403
 
-const disableInvalidUserApiKey = (context = 'Steam API', apiErrorMessage = '') => {
+const disableInvalidUserApiKey = (context = 'Steam API', apiErrorMessage = ''): boolean => {
     const userApiKey = (state.apiKey || '').trim()
     if (!userApiKey) {
         return false
@@ -166,7 +171,7 @@ const disableInvalidUserApiKey = (context = 'Steam API', apiErrorMessage = '') =
 }
 
 // Error Handling Helper
-const handleApiError = (response, context) => {
+const handleApiError = (response: { status: number }, context: string): string => {
     if (response.status === 401 || response.status === 403) {
         return `Access Denied: Please check your API Key and ensure your Steam Profile Privacy Settings are set to 'Public'.`
     }
@@ -189,7 +194,7 @@ const loadState = async () => {
             const parsed = JSON.parse(saved)
             state.steamId = parsed.steamId || ''
             state.apiKey = parsed.apiKey || ''
-            state.columns = parsed.columns || ['Backlog', 'Playing', 'Completed']
+            state.columns = parsed.columns || [...DEFAULT_BOARD_COLUMNS]
             state.lastUpdated = parsed.lastUpdated || 0
             state.userProfile = parsed.userProfile || null
         } catch (e) {
@@ -221,7 +226,7 @@ watch(() => [state.steamId, state.apiKey, state.columns, state.lastUpdated, stat
 
 // Helper for Stats
 // Returns { total, achieved, error }
-const getCompletionData = (game) => {
+const getCompletionData = (game: SteamGame): CompletionData => {
     // If detailed list exists
     if (game.achievementsList && game.achievementsList.achievements) {
         const total = game.achievementsList.achievements.length
@@ -317,9 +322,28 @@ const fetchGameDetails = async (game, force = false) => {
             return
         }
 
-        const playerAchievements = playerData.playerstats.achievements
-        const schemaAchievements = schemaData?.game?.availableGameStats?.achievements || []
-        const globalAchievements = globalData?.achievementpercentages?.achievements || []
+        type PlayerAchievement = {
+            apiname: string
+            name?: string
+            description?: string
+            achieved: number | boolean
+            unlocktime?: number
+        }
+        type SchemaAchievement = {
+            name: string
+            displayName?: string
+            description?: string
+            icon?: string
+            icongray?: string
+        }
+        type GlobalAchievement = {
+            name: string
+            percent?: number | string
+        }
+
+        const playerAchievements = playerData.playerstats.achievements as PlayerAchievement[]
+        const schemaAchievements = (schemaData?.game?.availableGameStats?.achievements || []) as SchemaAchievement[]
+        const globalAchievements = (globalData?.achievementpercentages?.achievements || []) as GlobalAchievement[]
 
         const schemaMap = new Map(schemaAchievements.map(a => [a.name, a]))
         const globalMap = new Map(globalAchievements.map(a => [a.name, a.percent]))
@@ -440,7 +464,7 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
 
             return {
                 ...g,
-                status: existing ? existing.status : 'Backlog',
+                status: existing ? existing.status : BACKLOG_COLUMN,
                 achievements: existing ? existing.achievements : null,
                 achievementsList: existing ? existing.achievementsList : null,
                 hidden: existing ? existing.hidden : false,
@@ -482,16 +506,17 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
     }
 }
 
-const addColumn = (name) => {
+const addColumn = (name: string): void => {
     if (name && !state.columns.includes(name)) {
         state.columns.push(name)
     }
 }
 
-const removeColumn = (name) => {
+const removeColumn = (name: string): void => {
     const idx = state.columns.indexOf(name)
     if (idx > -1) {
-        const fallback = state.columns[0] === name ? (state.columns[1] || 'Backlog') : state.columns[0]
+        const fallbackColumn = state.columns[0] === name ? (state.columns[1] || BACKLOG_COLUMN) : state.columns[0]
+        const fallback = getColumnName(fallbackColumn)
         state.games.forEach(g => {
             if (g.status === name) {
                 g.status = fallback
@@ -502,7 +527,7 @@ const removeColumn = (name) => {
     }
 }
 
-const clearData = () => {
+const clearData = (): void => {
     if (confirm("Clear all local data?")) {
         localStorage.removeItem(STATE_KEY)
         clearDB().then(() => {
@@ -512,7 +537,7 @@ const clearData = () => {
 }
 
 // Exposed update method
-const updateGameStatus = async (game, status) => {
+const updateGameStatus = async (game: SteamGame, status: string): Promise<void> => {
     const targetGame = state.games.find(g => g.appid === game.appid);
     if (targetGame) {
         targetGame.status = status;
@@ -532,7 +557,7 @@ const updateGameStatus = async (game, status) => {
  * The game keeps its primary `status` column and gets an entry in `duplicateColumns`.
  * A game must always remain in at least one column (its primary status).
  */
-const copyGameToColumn = async (game, column) => {
+const copyGameToColumn = async (game: SteamGame, column: string): Promise<void> => {
     const targetGame = state.games.find(g => g.appid === game.appid);
     if (!targetGame) return;
 
@@ -554,7 +579,7 @@ const copyGameToColumn = async (game, column) => {
  * If it's a duplicate column, it's simply removed from duplicateColumns.
  * A game must always remain in at least one column.
  */
-const removeGameFromColumn = async (game, column) => {
+const removeGameFromColumn = async (game: SteamGame, column: string): Promise<void> => {
     const targetGame = state.games.find(g => g.appid === game.appid);
     if (!targetGame) return;
 
@@ -578,14 +603,14 @@ const removeGameFromColumn = async (game, column) => {
 /**
  * Check if a game is in multiple columns (has duplicates).
  */
-const isGameDuplicated = (game) => {
+const isGameDuplicated = (game: SteamGame): boolean => {
     return game.duplicateColumns && game.duplicateColumns.length > 0;
 }
 
 /**
  * Get all columns a game appears in (primary + duplicates).
  */
-const getGameColumns = (game) => {
+const getGameColumns = (game: SteamGame): string[] => {
     const cols = [game.status];
     if (game.duplicateColumns) {
         cols.push(...game.duplicateColumns);
@@ -593,7 +618,7 @@ const getGameColumns = (game) => {
     return cols;
 }
 
-const toggleGameVisibility = async (game) => {
+const toggleGameVisibility = async (game: SteamGame): Promise<void> => {
     const targetGame = state.games.find(g => g.appid === game.appid);
     if (targetGame) {
         targetGame.hidden = !targetGame.hidden;
@@ -601,7 +626,7 @@ const toggleGameVisibility = async (game) => {
     }
 }
 
-const setGameVisibility = async (game, isHidden) => {
+const setGameVisibility = async (game: SteamGame, isHidden: boolean): Promise<void> => {
     const targetGame = state.games.find(g => g.appid === game.appid);
     if (targetGame) {
         targetGame.hidden = isHidden;
@@ -609,7 +634,7 @@ const setGameVisibility = async (game, isHidden) => {
     }
 }
 
-const setGamesVisibility = async (games, isHidden) => {
+const setGamesVisibility = async (games: SteamGame[], isHidden: boolean): Promise<void> => {
     games.forEach(g => {
         const target = state.games.find(tg => tg.appid === g.appid)
         if (target) target.hidden = isHidden
@@ -630,7 +655,7 @@ const setGamesVisibility = async (games, isHidden) => {
  * @param {boolean} onlyUnassigned - If true, only move games currently in "Backlog"
  * @returns {{ columnsCreated: string[], columnsRemoved: string[], gamesMoved: number, gamesReset: number, gamesNotFound: number }}
  */
-const importCollections = async (data, mode = 'add', onlyUnassigned = false) => {
+const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'replace' = 'add', onlyUnassigned = false): Promise<{ columnsCreated: string[]; columnsRemoved: string[]; gamesMoved: number; gamesReset: number; gamesNotFound: number }> => {
     if (!data || !Array.isArray(data.collections)) {
         throw new Error('Invalid import data: expected { collections: [...] }')
     }
@@ -648,19 +673,21 @@ const importCollections = async (data, mode = 'add', onlyUnassigned = false) => 
 
     if (mode === 'replace') {
         // Ensure "Backlog" always exists
-        const newColumns = ['Backlog']
+        const newColumns = [BACKLOG_COLUMN]
         for (const name of collectionNames) {
-            if (name !== 'Backlog' && !newColumns.includes(name)) {
+            if (name !== BACKLOG_COLUMN && !newColumns.includes(name)) {
                 newColumns.push(name)
             }
         }
 
         // Track removed columns
-        columnsRemoved = state.columns.filter(c => !newColumns.includes(c))
+        columnsRemoved = state.columns
+            .map(c => getColumnName(c))
+            .filter(c => !newColumns.includes(c))
 
         // Replace columns list
         state.columns.splice(0, state.columns.length, ...newColumns)
-        columnsCreated = newColumns.filter(c => c !== 'Backlog')
+        columnsCreated = newColumns.filter(c => c !== BACKLOG_COLUMN)
 
         // Build a map: appid -> collection name (last collection wins if game is in multiple)
         const gameToColumn = new Map()
@@ -675,7 +702,6 @@ const importCollections = async (data, mode = 'add', onlyUnassigned = false) => 
         }
 
         // Assign every game
-        // TODO manage a game being in multiple collections - currently it will just be assigned to the last one encountered in the list
         for (const game of state.games) {
             const targetCol = gameToColumn.get(game.appid)
             if (targetCol) {
@@ -684,8 +710,8 @@ const importCollections = async (data, mode = 'add', onlyUnassigned = false) => 
                     gamesMoved++
                 }
             } else {
-                if (game.status !== 'Backlog') {
-                    game.status = 'Backlog'
+                if (game.status !== BACKLOG_COLUMN) {
+                    game.status = BACKLOG_COLUMN
                     gamesReset++
                 }
             }
@@ -713,7 +739,7 @@ const importCollections = async (data, mode = 'add', onlyUnassigned = false) => 
                 }
 
                 // Skip if only assigning unassigned games and game is not in Backlog
-                if (onlyUnassigned && game.status !== 'Backlog') continue
+                if (onlyUnassigned && game.status !== BACKLOG_COLUMN) continue
 
                 // Skip if game is already in this column
                 if (game.status === colName) continue
@@ -753,3 +779,4 @@ export function useSteam() {
         getGameColumns
     }
 }
+

@@ -1,5 +1,5 @@
 import {onMounted} from 'vue'
-import {useSteam} from './useSteam.js'
+import {useSteam} from './useSteam'
 
 /**
  * Composable that auto-loads achievement stats on mount if stale (>48h) or missing.
@@ -29,4 +29,5 @@ export function useStatsAutoLoad() {
 
 	return steam
 }
+
 

@@ -1,12 +1,28 @@
-<script setup>
+<script setup lang="ts">
 import {ref, computed, reactive} from 'vue'
-import {useStatsAutoLoad} from '@/composables/useStatsAutoLoad.js'
-import {useGameInfoModal} from '@/composables/useGameInfoModal.js'
+import {useStatsAutoLoad} from '@/composables/useStatsAutoLoad'
+import {useGameInfoModal} from '@/composables/useGameInfoModal'
 import GameInfoComponent from '../GameInfoComponent.vue'
 import GameCard from '../ui/GameCard.vue'
 import KanbanColumn from '../ui/KanbanColumn.vue'
 import BaseOverlay from '../ui/BaseOverlay.vue'
 import ViewHeader from "@/components/ui/ViewHeader.vue";
+import type {SteamColumn, SteamGame} from "@/types/domain";
+import {BOARD_COLOR_OPTIONS, DEFAULT_COLUMN_COLOR} from '@/types/board'
+
+type EditableColumn = { name: string; color: string; id: string }
+type TouchState = {
+	active: boolean
+	game: SteamGame | null
+	sourceColumn: string
+	timer: ReturnType<typeof setTimeout> | null
+	initialX: number
+	initialY: number
+	element: HTMLElement | null
+	offsetX: number
+	offsetY: number
+	scrollDirection: -1 | 0 | 1
+}
 
 const {state, refreshLibrary, fetchGameDetails, getCompletionData, updateGameStatus, toggleGameVisibility, copyGameToColumn, removeGameFromColumn} = useStatsAutoLoad()
 const {showGameInfo, selectedGame, openGameInfo, closeGameInfo} = useGameInfoModal()
@@ -27,14 +43,14 @@ const dragSourceColumn = ref('')
 
 
 // Layout Editor State
-const editingColumns = ref([])
-const availableColors = ['#66c0f4', '#a4d007', '#ffc83d', '#ff5252', '#be5eff', '#ffffff']
+const editingColumns = ref<EditableColumn[]>([])
+const availableColors = BOARD_COLOR_OPTIONS
 
 // DOM Refs
-const boardContainerRef = ref(null)
+const boardContainerRef = ref<HTMLElement | null>(null)
 
 // Touch Drag State
-const touchState = reactive({
+const touchState = reactive<TouchState>({
 	active: false,
 	game: null,
 	sourceColumn: '',
@@ -47,11 +63,11 @@ const touchState = reactive({
 	scrollDirection: 0
 })
 
-let scrollTimer = null;
+let scrollTimer: ReturnType<typeof setInterval> | null = null
 
 
 
-const filteredGames = computed(() => {
+const filteredGames = computed<SteamGame[]>(() => {
 	let result = state.games
 	if (searchTerm.value) {
 		const lower = searchTerm.value.toLowerCase()
@@ -78,33 +94,36 @@ const filteredGames = computed(() => {
 	return result
 })
 
-const getGamesByStatus = (status) => {
+const getGamesByStatus = (status: string) => {
 	return filteredGames.value.filter(g => {
 		return g.status === status || (g.duplicateColumns && g.duplicateColumns.includes(status))
 	})
 }
 
-const isGameDuplicateInColumn = (game, columnName) => {
+const isGameDuplicateInColumn = (game: SteamGame, columnName: string) => {
 	// A game is a "duplicate" in a column if it appears in multiple columns
 	const cols = [game.status, ...(game.duplicateColumns || [])]
 	return cols.length > 1 && cols.includes(columnName)
 }
 
-const onDragStart = (evt, game, columnName) => {
+const onDragStart = (evt: DragEvent, game: SteamGame, columnName: string): void => {
+	const dataTransfer = evt.dataTransfer
+	if (!dataTransfer) return
+
 	isDragging.value = true
 	isShiftHeld.value = evt.shiftKey
 	dragSourceColumn.value = columnName
 	const cols = [game.status, ...(game.duplicateColumns || [])]
 	draggedGameIsDuplicate.value = cols.length > 1
-	evt.dataTransfer.dropEffect = evt.shiftKey ? 'copy' : 'move'
-	evt.dataTransfer.effectAllowed = 'copyMove'
-	evt.dataTransfer.setData('gameId', game.appid.toString())
-	evt.dataTransfer.setData('sourceColumn', columnName)
+	dataTransfer.dropEffect = evt.shiftKey ? 'copy' : 'move'
+	dataTransfer.effectAllowed = 'copyMove'
+	dataTransfer.setData('gameId', game.appid.toString())
+	dataTransfer.setData('sourceColumn', columnName)
 	
-	const onKeyDown = (e) => {
+	const onKeyDown = (e: KeyboardEvent): void => {
 		if (e.key === 'Shift') isShiftHeld.value = true
 	}
-	const onKeyUp = (e) => {
+	const onKeyUp = (e: KeyboardEvent): void => {
 		if (e.key === 'Shift') isShiftHeld.value = false
 	}
 	window.addEventListener('keydown', onKeyDown)
@@ -118,13 +137,19 @@ const onDragStart = (evt, game, columnName) => {
 		dragSourceColumn.value = ''
 		window.removeEventListener('keydown', onKeyDown)
 		window.removeEventListener('keyup', onKeyUp)
-		evt.target.removeEventListener('dragend', cleanup)
+		if (evt.currentTarget instanceof HTMLElement) {
+			evt.currentTarget.removeEventListener('dragend', cleanup)
+		}
 	}
-	evt.target.addEventListener('dragend', cleanup)
+	if (evt.currentTarget instanceof HTMLElement) {
+		evt.currentTarget.addEventListener('dragend', cleanup)
+	}
 }
 
-const onDrop = (evt, status) => {
-	const gameId = evt.dataTransfer.getData('gameId')
+const onDrop = (evt: DragEvent, status: string): void => {
+	const dataTransfer = evt.dataTransfer
+	if (!dataTransfer) return
+	const gameId = dataTransfer.getData('gameId')
 	const game = state.games.find(g => g.appid.toString() === gameId)
 	if (game) {
 		if (isShiftHeld.value || evt.shiftKey) {
@@ -144,7 +169,7 @@ const onDrop = (evt, status) => {
 }
 
 // --- Touch Drag Logic ---
-const onTouchStart = (evt, game, columnName) => {
+const onTouchStart = (evt: TouchEvent, game: SteamGame, columnName: string): void => {
 	// Only start if one finger
 	if (evt.touches.length > 1) return
 
@@ -163,7 +188,7 @@ const onTouchStart = (evt, game, columnName) => {
 	}, 200)
 }
 
-const onTouchMove = (evt) => {
+const onTouchMove = (evt: TouchEvent): void => {
 	if (touchState.active) {
 		if (evt.cancelable) evt.preventDefault() // Prevent scrolling
 		
@@ -185,48 +210,53 @@ const onTouchMove = (evt) => {
 	}
 }
 
-const handleAutoScroll = (x) => {
-	if (!boardContainerRef.value) return;
+const handleAutoScroll = (x: number): void => {
+	if (!boardContainerRef.value) return
 
-	const container = boardContainerRef.value;
-	const threshold = 80; // Larger threshold for mobile
-	const speed = 15; // Scroll speed
-	const rect = container.getBoundingClientRect();
+	const container = boardContainerRef.value
+	const threshold = 80 // Larger threshold for mobile
+	const speed = 15 // Scroll speed
+	const rect = container.getBoundingClientRect()
 
-	let direction = 0;
+	let direction: -1 | 0 | 1 = 0
 	if (x < rect.left + threshold) {
-		direction = -1;
+		direction = -1
 	} else if (x > rect.right - threshold) {
-		direction = 1;
+		direction = 1
 	}
 
 	if (direction === 0) {
-		stopScrolling();
-		return;
+		stopScrolling()
+		return
 	}
 
 	if (touchState.scrollDirection !== direction) {
-		stopScrolling();
-		touchState.scrollDirection = direction;
+		stopScrolling()
+		touchState.scrollDirection = direction
 
 		const scrollStep = () => {
 			if (touchState.scrollDirection !== 0 && boardContainerRef.value) {
-				boardContainerRef.value.scrollLeft += (speed * touchState.scrollDirection);
+				boardContainerRef.value.scrollLeft += (speed * touchState.scrollDirection)
 			}
-		};
+		}
 
-		scrollTimer = setInterval(scrollStep, 16);
+		scrollTimer = setInterval(scrollStep, 16)
 	}
 }
 
-const onTouchEnd = (evt) => {
+const onTouchEnd = (evt: TouchEvent): void => {
 	clearTimeout(touchState.timer)
-	stopScrolling();
+	stopScrolling()
 	if (touchState.active) {
 		// Find drop target
 		const touch = evt.changedTouches[0]
 
 		// Hide ghost momentarily to find element underneath
+		if (!touchState.element) {
+			stopTouchDrag()
+			draggedGameIsDuplicate.value = false
+			return
+		}
 		touchState.element.style.display = 'none'
 		const target = document.elementFromPoint(touch.clientX, touch.clientY)
 		touchState.element.style.display = 'block'
@@ -254,10 +284,11 @@ const onTouchEnd = (evt) => {
 	draggedGameIsDuplicate.value = false
 }
 
-const startTouchDrag = (evt) => {
+const startTouchDrag = (evt: TouchEvent): void => {
 	touchState.active = true
 	// Create ghost element
-	const original = evt.target.closest('.card')
+	if (!(evt.target instanceof Element)) return
+	const original = evt.target.closest('.card') as HTMLElement | null
 	if (!original) return
 
 	// Calculate offset so we hold it where we touched it
@@ -266,7 +297,7 @@ const startTouchDrag = (evt) => {
 	touchState.offsetY = evt.touches[0].clientY - rect.top
 
 	// Clone
-	const clone = original.cloneNode(true)
+	const clone = original.cloneNode(true) as HTMLElement
 	clone.style.position = 'fixed'
 	clone.style.width = rect.width + 'px'
 	clone.style.height = rect.height + 'px'
@@ -293,22 +324,22 @@ const stopTouchDrag = () => {
 	}
 	touchState.game = null
 	touchState.sourceColumn = ''
-	stopScrolling();
+	stopScrolling()
 }
 
 const stopScrolling = () => {
 	if (scrollTimer) {
-		clearInterval(scrollTimer);
-		scrollTimer = null;
+		clearInterval(scrollTimer)
+		scrollTimer = null
 	}
-	touchState.scrollDirection = 0;
+	touchState.scrollDirection = 0
 }
 
-const toggleHide = (game) => {
+const toggleHide = (game: SteamGame): void => {
 	toggleGameVisibility(game)
 }
 
-const handleCopyGame = (game) => {
+const handleCopyGame = (game: SteamGame): void => {
 	// On mobile/click: show a simple prompt to pick a column
 	const colNames = state.columns.map(c => typeof c === 'object' ? c.name : c)
 	const currentCols = [game.status, ...(game.duplicateColumns || [])]
@@ -319,17 +350,19 @@ const handleCopyGame = (game) => {
 	}
 	const choice = prompt(`Copy "${game.name}" to column:\n${available.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nEnter number:`)
 	if (choice) {
-		const idx = parseInt(choice) - 1
+		const idx = parseInt(choice, 10) - 1
 		if (idx >= 0 && idx < available.length) {
 			copyGameToColumn(game, available[idx])
 		}
 	}
 }
 
-const onBinDrop = (evt) => {
+const onBinDrop = (evt: DragEvent): void => {
 	evt.preventDefault()
-	const gameId = evt.dataTransfer.getData('gameId')
-	const sourceColumn = evt.dataTransfer.getData('sourceColumn')
+	const dataTransfer = evt.dataTransfer
+	if (!dataTransfer) return
+	const gameId = dataTransfer.getData('gameId')
+	const sourceColumn = dataTransfer.getData('sourceColumn')
 	const game = state.games.find(g => g.appid.toString() === gameId)
 	if (game && sourceColumn) {
 		const cols = [game.status, ...(game.duplicateColumns || [])]
@@ -350,18 +383,18 @@ const openLayoutEditor = () => {
 	editingColumns.value = state.columns.map(col => {
 		// Handle legacy string columns
 		if (typeof col === 'string') {
-			return {name: col, color: '#66c0f4', id: col}
+			return {name: col, color: DEFAULT_COLUMN_COLOR, id: col}
 		}
-		return {...col}
+		return {name: col.name, color: col.color || DEFAULT_COLUMN_COLOR, id: col.id || col.name}
 	})
 	showLayoutEditor.value = true
 }
 
 const addEditColumn = () => {
-	editingColumns.value.push({name: 'New Column', color: '#66c0f4', id: Date.now().toString()})
+	editingColumns.value.push({name: 'New Column', color: DEFAULT_COLUMN_COLOR, id: Date.now().toString()})
 }
 
-const removeEditColumn = (index) => {
+const removeEditColumn = (index: number): void => {
 	if (editingColumns.value.length <= 1) {
 		alert("Must have at least one column")
 		return
@@ -371,53 +404,55 @@ const removeEditColumn = (index) => {
 	}
 }
 
-const moveColumn = (index, direction) => {
+const moveColumn = (index: number, direction: -1 | 1): void => {
 	if (direction === -1 && index > 0) {
-		const temp = editingColumns.value[index];
-		editingColumns.value[index] = editingColumns.value[index - 1];
-		editingColumns.value[index - 1] = temp;
+		const temp = editingColumns.value[index]
+		editingColumns.value[index] = editingColumns.value[index - 1]
+		editingColumns.value[index - 1] = temp
 	} else if (direction === 1 && index < editingColumns.value.length - 1) {
-		const temp = editingColumns.value[index];
-		editingColumns.value[index] = editingColumns.value[index + 1];
-		editingColumns.value[index + 1] = temp;
+		const temp = editingColumns.value[index]
+		editingColumns.value[index] = editingColumns.value[index + 1]
+		editingColumns.value[index + 1] = temp
 	}
 }
 
 const saveLayout = () => {
-	const newNames = new Set(editingColumns.value.map(c => c.name));
-	const oldColumns = state.columns.map(c => typeof c === 'string' ? c : c.name);
+	if (editingColumns.value.length === 0) return
 
-	const removedNames = oldColumns.filter(name => !newNames.has(name));
+	const newNames = new Set(editingColumns.value.map(c => c.name))
+	const oldColumns = state.columns.map(c => typeof c === 'string' ? c : c.name)
+
+	const removedNames = oldColumns.filter(name => !newNames.has(name))
 
 	if (removedNames.length > 0) {
-		const fallback = editingColumns.value[0].name;
+		const fallback = editingColumns.value[0].name
 		state.games.forEach(g => {
 			if (removedNames.includes(g.status)) {
-				g.status = fallback;
+				g.status = fallback
 			}
 			// Clean up duplicateColumns that reference removed columns
 			if (g.duplicateColumns) {
-				g.duplicateColumns = g.duplicateColumns.filter(c => !removedNames.includes(c));
+				g.duplicateColumns = g.duplicateColumns.filter(c => !removedNames.includes(c))
 			}
-		});
+		})
 	}
 
-	const names = editingColumns.value.map(c => c.name);
+	const names = editingColumns.value.map(c => c.name)
 	if (new Set(names).size !== names.length) {
-		alert("Column names must be unique");
-		return;
+		alert("Column names must be unique")
+		return
 	}
 
-	state.columns = [...editingColumns.value]; // Save as objects
-	showLayoutEditor.value = false;
+	state.columns = [...editingColumns.value] // Save as objects
+	showLayoutEditor.value = false
 }
 
 // Helper to get color safely
-const getColColor = (col) => {
-	return typeof col === 'object' ? col.color : '#66c0f4';
+const getColColor = (col: SteamColumn): string => {
+	return typeof col === 'object' ? (col.color || DEFAULT_COLUMN_COLOR) : DEFAULT_COLUMN_COLOR
 }
-const getColName = (col) => {
-	return typeof col === 'object' ? col.name : col;
+const getColName = (col: SteamColumn): string => {
+	return typeof col === 'object' ? col.name : col
 }
 
 </script>
@@ -445,7 +480,7 @@ const getColName = (col) => {
 						<font-awesome-icon icon="pen" /> 
 						<span>Edit Board</span>
 					</button>
-					<button @click="refreshLibrary" :disabled="state.loading" class="btn btn-secondary reload-stats-btn">
+					<button @click="() => refreshLibrary()" :disabled="state.loading" class="btn btn-secondary reload-stats-btn">
 						<template v-if="state.loading">Syncing...</template>
 						<template v-else>
 							<font-awesome-icon icon="rotate" /> 
