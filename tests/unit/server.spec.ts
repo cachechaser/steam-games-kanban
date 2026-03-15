@@ -3,7 +3,7 @@ import { createServerApp, getServerSteamApiKey, resolveSteamRequestPath, sanitiz
 
 describe('server helpers', () => {
   it('redacts key from logged urls', () => {
-    expect(sanitizeUrlForLogs('/x?key=secret&y=1')).toContain('key=%5BREDACTED%5D')
+    expect(sanitizeUrlForLogs('/x?key=secret&y=1')).toContain('key=[REDACTED]')
   })
 
   it('prefers STEAM_WEB_API_KEY and trims it', () => {

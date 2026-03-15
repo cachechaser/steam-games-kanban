@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import express from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
@@ -22,10 +21,27 @@ export const sanitizeUrlForLogs = (url = ''): string => {
         if (parsed.searchParams.has('key')) {
             parsed.searchParams.set('key', '[REDACTED]');
         }
-        return `${parsed.pathname}${parsed.search}`;
+        return `${parsed.pathname}${parsed.search}`.replace(/key=%5BREDACTED%5D/gi, 'key=[REDACTED]');
     } catch {
         return String(url).replace(/([?&]key=)[^&]+/i, '$1[REDACTED]');
     }
+};
+
+const STEAM_API_TARGET = 'https://api.steampowered.com';
+
+const readRawBody = async (req: Request): Promise<Buffer | undefined> => {
+    if (req.method === 'GET' || req.method === 'HEAD') {
+        return undefined;
+    }
+
+    return await new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk) => {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        req.on('end', () => resolve(chunks.length ? Buffer.concat(chunks) : Buffer.alloc(0)));
+        req.on('error', reject);
+    });
 };
 
 type SteamPathResolution =
@@ -99,35 +115,49 @@ export const createServerApp = () => {
         next();
     });
 
-    // Proxy Steam API calls (Matches your useSteam.js)
-    app.use('/api/steam', createProxyMiddleware({
-        target: 'https://api.steampowered.com',
-        changeOrigin: true,
-        pathRewrite: (path, req) => {
-            if (req.steamResolvedPath) {
-                return req.steamResolvedPath;
+    // Proxy Steam API calls without http-proxy-middleware to avoid DEP0060 noise.
+    app.use('/api/steam', async (req: Request, res: Response) => {
+        const targetPath = req.steamResolvedPath || req.url;
+        const safePath = sanitizeUrlForLogs(targetPath);
+
+        console.log(`[Proxy Request] Forwarding to Steam API: ${safePath} | keySource=${req.steamKeySource || 'unknown'}`);
+
+        try {
+            const targetUrl = `${STEAM_API_TARGET}${targetPath}`;
+            const body = await readRawBody(req);
+            const headers: Record<string, string> = {};
+
+            for (const [key, value] of Object.entries(req.headers)) {
+                if (!value) continue;
+                if (key.toLowerCase() === 'host' || key.toLowerCase() === 'content-length') continue;
+                headers[key] = Array.isArray(value) ? value.join(',') : value;
             }
-            return path.replace(/^\/api\/steam/, '');
-        },
-        logger: console,
-        on: {
-            proxyReq: (_proxyReq, req) => {
-                const targetPath = req.steamResolvedPath || req.url;
-                console.log(`[Proxy Request] Forwarding to Steam API: ${sanitizeUrlForLogs(targetPath)} | keySource=${req.steamKeySource || 'unknown'}`);
-            },
-            proxyRes: (proxyRes) => {
-                console.log(`[Proxy Response] Steam API returned ${proxyRes.statusCode}`);
-            },
-            error: (err: Error & { code?: string }, req: Request, res: Response) => {
-                const clientIP = req.ip || req.socket.remoteAddress || 'Unknown';
-                console.error(
-                    `[Proxy Error] ${err.code || err.message} | ` +
-                    `URL: ${sanitizeUrlForLogs(req.url)} | IP: ${clientIP} | Error: ${err.stack}`
-                );
-                res.status(502).json({ error: 'Failed to reach Steam API', details: err.message });
-            }
+
+            const steamRes = await fetch(targetUrl, {
+                method: req.method,
+                headers,
+                body: body ? new Uint8Array(body) : undefined,
+                redirect: 'manual'
+            });
+
+            steamRes.headers.forEach((value, key) => {
+                if (key.toLowerCase() === 'transfer-encoding') return;
+                res.setHeader(key, value);
+            });
+
+            const responseBody = Buffer.from(await steamRes.arrayBuffer());
+            console.log(`[Proxy Response] ${safePath} | status=${steamRes.status}`);
+            res.status(steamRes.status).send(responseBody);
+        } catch (err) {
+            const error = err as Error & { code?: string };
+            const clientIP = req.ip || req.socket.remoteAddress || 'Unknown';
+            console.error(
+                `[Proxy Error] ${error.code || error.message} | ` +
+                `URL: ${safePath} | IP: ${clientIP} | Error: ${error.stack}`
+            );
+            res.status(502).json({ error: 'Failed to reach Steam API', details: error.message });
         }
-    }));
+    });
 
     // Serve Vue App
     app.use(express.static(path.join(__dirname, 'dist')));
