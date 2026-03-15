@@ -360,7 +360,7 @@ const handleFileUpload = (event: Event) => {
 				</div>
 				<p class="import-mode-hint" v-if="importMode === 'add'">
 					Keeps your existing columns. New collection columns are added and games are sorted in.
-					A game in multiple collections will be placed in the last one listed.
+					A game in multiple collections keeps the last one as primary and is also added to the others.
 				</p>
 				<p class="import-mode-hint" v-else>
 					<font-awesome-icon icon="triangle-exclamation" /> Removes all existing columns and replaces them with the imported collections.

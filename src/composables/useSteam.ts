@@ -1,5 +1,5 @@
 import {reactive, toRaw, watch} from 'vue'
-import type { CollectionImportPayload, CompletionData, SteamGame, SteamState } from '@/types/domain'
+import type { CollectionImportPayload, CompletionData, GameAchievement, SteamGame, SteamState } from '@/types/domain'
 import { BACKLOG_COLUMN, DEFAULT_BOARD_COLUMNS } from '@/types/board'
 
 const STATE_KEY = 'steam_kanban_state'
@@ -274,7 +274,7 @@ const fetchUserProfile = async () => {
 
 // Fetch detailed achievement data for a single game.
 // Used internally by refreshLibrary and exposed for manual single-game "Load Stats" button.
-const fetchGameDetails = async (game, force = false) => {
+const fetchGameDetails = async (game: SteamGame, force = false) => {
     if (game.loadingDetails) return
 
     // Skip if we already have valid data and no update is needed (unless forced)
@@ -348,7 +348,14 @@ const fetchGameDetails = async (game, force = false) => {
         const schemaMap = new Map(schemaAchievements.map(a => [a.name, a]))
         const globalMap = new Map(globalAchievements.map(a => [a.name, a.percent]))
 
-        const combined = playerAchievements.map(pa => {
+        const normalizeAchieved = (value: number | boolean): GameAchievement['achieved'] => {
+            if (typeof value === 'boolean') {
+                return value
+            }
+            return value === 1 ? 1 : 0
+        }
+
+        const combined: GameAchievement[] = playerAchievements.map(pa => {
             const schema = schemaMap.get(pa.apiname)
             const globalPercent = globalMap.get(pa.apiname)
 
@@ -356,7 +363,7 @@ const fetchGameDetails = async (game, force = false) => {
                 apiname: pa.apiname,
                 name: schema?.displayName || pa.name || pa.apiname,
                 description: schema?.description || pa.description || '',
-                achieved: pa.achieved,
+                achieved: normalizeAchieved(pa.achieved),
                 unlocktime: pa.unlocktime,
                 icon: schema?.icon || '',
                 icongray: schema?.icongray || '',
@@ -655,7 +662,7 @@ const setGamesVisibility = async (games: SteamGame[], isHidden: boolean): Promis
  * @param {boolean} onlyUnassigned - If true, only move games currently in "Backlog"
  * @returns {{ columnsCreated: string[], columnsRemoved: string[], gamesMoved: number, gamesReset: number, gamesNotFound: number }}
  */
-const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'replace' = 'add', onlyUnassigned = false): Promise<{ columnsCreated: string[]; columnsRemoved: string[]; gamesMoved: number; gamesReset: number; gamesNotFound: number }> => {
+const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'replace' = 'add', onlyUnassigned: boolean = false): Promise<{ columnsCreated: string[]; columnsRemoved: string[]; gamesMoved: number; gamesReset: number; gamesNotFound: number }> => {
     if (!data || !Array.isArray(data.collections)) {
         throw new Error('Invalid import data: expected { collections: [...] }')
     }
@@ -665,6 +672,26 @@ const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'r
     let gamesMoved = 0
     let gamesReset = 0
     let gamesNotFound = 0
+
+    const columnsEqual = (a: string[] = [], b: string[] = []) => {
+        if (a.length !== b.length) return false
+        return a.every((value, index) => value === b[index])
+    }
+
+    const gameToColumns = new Map<number, string[]>()
+    for (const collection of data.collections) {
+        const colName = collection.name
+        const gameIds = collection.game_ids || []
+        if (!colName || gameIds.length === 0) continue
+
+        for (const appid of gameIds) {
+            const columns = gameToColumns.get(appid) || []
+            if (!columns.includes(colName)) {
+                columns.push(colName)
+            }
+            gameToColumns.set(appid, columns)
+        }
+    }
 
     // Collect all collection names and build a set of all game ids mentioned
     const collectionNames = data.collections
@@ -689,24 +716,26 @@ const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'r
         state.columns.splice(0, state.columns.length, ...newColumns)
         columnsCreated = newColumns.filter(c => c !== BACKLOG_COLUMN)
 
-        // Build a map: appid -> collection name (last collection wins if game is in multiple)
-        const gameToColumn = new Map()
-        for (const collection of data.collections) {
-            const colName = collection.name
-            const gameIds = collection.game_ids || []
-            if (!colName || gameIds.length === 0) continue
-
-            for (const appid of gameIds) {
-                gameToColumn.set(appid, colName)
-            }
-        }
-
         // Assign every game
         for (const game of state.games) {
-            const targetCol = gameToColumn.get(game.appid)
-            if (targetCol) {
-                if (game.status !== targetCol) {
-                    game.status = targetCol
+            const targetColumns = gameToColumns.get(game.appid) || []
+            if (targetColumns.length > 0) {
+                const targetPrimary = targetColumns[targetColumns.length - 1]
+                const targetDupes = targetColumns.filter(c => c !== targetPrimary)
+                const currentDupes = game.duplicateColumns || []
+
+                let changed = false
+                if (game.status !== targetPrimary) {
+                    game.status = targetPrimary
+                    changed = true
+                }
+
+                if (!columnsEqual(currentDupes, targetDupes)) {
+                    game.duplicateColumns = targetDupes
+                    changed = true
+                }
+
+                if (changed) {
                     gamesMoved++
                 }
             } else {
@@ -714,39 +743,44 @@ const importCollections = async (data: CollectionImportPayload, mode: 'add' | 'r
                     game.status = BACKLOG_COLUMN
                     gamesReset++
                 }
+
+                if ((game.duplicateColumns || []).length > 0) {
+                    game.duplicateColumns = []
+                }
             }
         }
     } else {
         // 'add' mode: keep existing columns, add new ones, sort games in
-        for (const collection of data.collections) {
-            const colName = collection.name
-            const gameIds = collection.game_ids || []
+        for (const name of collectionNames) {
+            if (!state.columns.includes(name)) {
+                addColumn(name)
+                columnsCreated.push(name)
+            }
+        }
 
-            if (!colName || gameIds.length === 0) continue
-
-            // Create column if it doesn't exist
-            if (!state.columns.includes(colName)) {
-                addColumn(colName)
-                columnsCreated.push(colName)
+        for (const [appid, targetColumns] of gameToColumns.entries()) {
+            const game = state.games.find(g => g.appid === appid)
+            if (!game) {
+                gamesNotFound++
+                continue
             }
 
-            // Assign games to the column
-            for (const appid of gameIds) {
-                const game = state.games.find(g => g.appid === appid)
-                if (!game) {
-                    gamesNotFound++
-                    continue
-                }
+            // Skip if only assigning unassigned games and game is not in Backlog
+            if (onlyUnassigned && game.status !== BACKLOG_COLUMN) continue
 
-                // Skip if only assigning unassigned games and game is not in Backlog
-                if (onlyUnassigned && game.status !== BACKLOG_COLUMN) continue
+            const targetPrimary = targetColumns[targetColumns.length - 1]
+            const nextDupesSet = new Set<string>([...(game.duplicateColumns || []), ...targetColumns])
+            nextDupesSet.delete(targetPrimary)
+            const nextDupes = Array.from(nextDupesSet)
 
-                // Skip if game is already in this column
-                if (game.status === colName) continue
+            const primaryChanged = game.status !== targetPrimary
+            const dupesChanged = !columnsEqual(game.duplicateColumns || [], nextDupes)
 
-                game.status = colName
-                gamesMoved++
-            }
+            if (!primaryChanged && !dupesChanged) continue
+
+            game.status = targetPrimary
+            game.duplicateColumns = nextDupes
+            gamesMoved++
         }
     }
 

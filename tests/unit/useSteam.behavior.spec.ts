@@ -197,14 +197,41 @@ describe('useSteam behavior', () => {
     const result = await steam.importCollections({
       collections: [
         { name: 'RPG', game_ids: [10, 99] },
-        { name: 'Coop', game_ids: [20] }
+        { name: 'Coop', game_ids: [20, 10] }
       ]
     }, 'add', false)
 
     expect(result.columnsCreated).toEqual(['RPG', 'Coop'])
     expect(result.gamesMoved).toBe(2)
     expect(result.gamesNotFound).toBe(1)
-    expect(steam.state.games.find((g) => g.appid === 10)?.status).toBe('RPG')
+    expect(steam.state.games.find((g) => g.appid === 10)?.status).toBe('Coop')
+    expect(steam.state.games.find((g) => g.appid === 10)?.duplicateColumns).toEqual(['RPG'])
+  })
+
+  it('imports only unassigned games in add mode while preserving overlaps', async () => {
+    installIndexedDbMock()
+    vi.stubGlobal('fetch', vi.fn(async () => makeJsonResponse({ hasServerApiKey: false })))
+
+    const steam = await importFreshSteam()
+    steam.state.columns = ['Backlog', 'Playing']
+    steam.state.games = [
+      { appid: 10, name: 'A', status: 'Backlog' } as SteamGame,
+      { appid: 20, name: 'B', status: 'Playing', duplicateColumns: ['Completed'] } as SteamGame
+    ]
+
+    const result = await steam.importCollections({
+      collections: [
+        { name: 'RPG', game_ids: [10, 20] },
+        { name: 'Coop', game_ids: [10, 20] }
+      ]
+    }, 'add', true)
+
+    expect(result.columnsCreated).toEqual(['RPG', 'Coop'])
+    expect(result.gamesMoved).toBe(1)
+    expect(steam.state.games.find((g) => g.appid === 10)?.status).toBe('Coop')
+    expect(steam.state.games.find((g) => g.appid === 10)?.duplicateColumns).toEqual(['RPG'])
+    expect(steam.state.games.find((g) => g.appid === 20)?.status).toBe('Playing')
+    expect(steam.state.games.find((g) => g.appid === 20)?.duplicateColumns).toEqual(['Completed'])
   })
 
   it('imports collections in replace mode and resets unassigned games', async () => {
@@ -220,15 +247,17 @@ describe('useSteam behavior', () => {
 
     const result = await steam.importCollections({
       collections: [
-        { name: 'Favorites', game_ids: [10] }
+        { name: 'Favorites', game_ids: [10] },
+        { name: 'Replay', game_ids: [10] }
       ]
     }, 'replace', false)
 
     expect(result.columnsRemoved).toContain('Old')
     expect(result.gamesMoved).toBe(1)
     expect(result.gamesReset).toBe(1)
-    expect(steam.state.columns).toEqual(['Backlog', 'Favorites'])
-    expect(steam.state.games.find((g) => g.appid === 10)?.status).toBe('Favorites')
+    expect(steam.state.columns).toEqual(['Backlog', 'Favorites', 'Replay'])
+    expect(steam.state.games.find((g) => g.appid === 10)?.status).toBe('Replay')
+    expect(steam.state.games.find((g) => g.appid === 10)?.duplicateColumns).toEqual(['Favorites'])
     expect(steam.state.games.find((g) => g.appid === 20)?.status).toBe('Backlog')
   })
 
