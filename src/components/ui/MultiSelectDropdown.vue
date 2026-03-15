@@ -42,6 +42,28 @@ const dropdownOpen = ref(false)
 const triggerEl = ref<HTMLElement | null>(null)
 const menuStyle = ref<CSSProperties>({})
 
+const DEFAULT_DROPDOWN_Z_INDEX = 1000
+const OVERLAY_DROPDOWN_Z_OFFSET = 2
+
+const resolveDropdownZIndex = (): number => {
+	const trigger = triggerEl.value
+	if (!trigger) return DEFAULT_DROPDOWN_Z_INDEX
+
+	const overlay = trigger.closest('.modal-overlay')
+	if (!(overlay instanceof HTMLElement)) return DEFAULT_DROPDOWN_Z_INDEX
+
+	const parsed = Number.parseInt(window.getComputedStyle(overlay).zIndex || '', 10)
+	if (Number.isFinite(parsed)) {
+		return parsed + OVERLAY_DROPDOWN_Z_OFFSET
+	}
+
+	return DEFAULT_DROPDOWN_Z_INDEX
+}
+
+const backdropStyle = computed<CSSProperties>(() => ({
+	zIndex: `${Math.max(resolveDropdownZIndex() - 1, 1)}`,
+}))
+
 /** Normalize an option to { key, label, locked } */
 const normalize = (opt: Option): NormalizedOption => {
 	if (typeof opt === 'string') return {key: opt, label: opt, locked: false}
@@ -94,6 +116,7 @@ const positionMenu = () => {
 		top: `${rect.bottom + 4}px`,
 		left: `${rect.left}px`,
 		minWidth: `${rect.width}px`,
+		zIndex: `${resolveDropdownZIndex()}`,
 	}
 }
 
@@ -202,7 +225,7 @@ onBeforeUnmount(() => {
 			</div>
 		</div>
 		<Teleport to="body">
-			<div v-if="dropdownOpen" class="dropdown-backdrop" @click.stop="closeDropdown"></div>
+			<div v-if="dropdownOpen" class="dropdown-backdrop" :style="backdropStyle" @click.stop="closeDropdown"></div>
 			<div v-if="dropdownOpen" class="dropdown-menu" :style="menuStyle">
 				<label
 						v-for="opt in displayOptions"
@@ -229,7 +252,7 @@ onBeforeUnmount(() => {
 			<span>{{ buttonLabel }}</span>
 		</button>
 		<Teleport to="body">
-			<div v-if="dropdownOpen" class="dropdown-backdrop" @click.stop="closeDropdown"></div>
+			<div v-if="dropdownOpen" class="dropdown-backdrop" :style="backdropStyle" @click.stop="closeDropdown"></div>
 			<div v-if="dropdownOpen" class="dropdown-menu" :style="menuStyle">
 				<label
 						v-for="opt in displayOptions"
