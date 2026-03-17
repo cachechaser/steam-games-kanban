@@ -267,7 +267,8 @@ const fetchUserProfile = async () => {
 
     try {
         const response = await fetch(buildSteamApiUrl('ISteamUser/GetPlayerSummaries/v0002/', {
-            steamids: state.steamId
+            steamids: state.steamId,
+            format: 'json'
         }))
         if (!response.ok) {
             const apiErrorMessage = handleApiError(response, 'User Profile')
@@ -304,11 +305,13 @@ const fetchGameDetails = async (game: SteamGame, force = false) => {
         const p1 = fetch(buildSteamApiUrl('ISteamUserStats/GetPlayerAchievements/v0001/', {
             appid: game.appid,
             steamid: state.steamId,
-            l: 'english'
+            l: 'english',
+            format: 'json'
         }))
         const p2 = fetch(buildSteamApiUrl('ISteamUserStats/GetSchemaForGame/v2/', {
             appid: game.appid,
-            l: 'english'
+            l: 'english',
+            format: 'json'
         }))
         const p3 = fetch(`/api/steam/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${game.appid}&format=json`)
 

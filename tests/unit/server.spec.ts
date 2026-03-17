@@ -1,5 +1,5 @@
 import request from 'supertest'
-import { createServerApp, getServerSteamApiKey, resolveSteamRequestPath, sanitizeUrlForLogs } from '../../server'
+import { createServerApp, getServerSteamApiKey, resolveSteamRequestPath, sanitizeUrlForLogs, shouldForwardProxyResponseHeader } from '../../server'
 
 describe('server helpers', () => {
   it('redacts key from logged urls', () => {
@@ -27,6 +27,14 @@ describe('server helpers', () => {
     delete process.env.STEAM_API_KEY
     const resolved = resolveSteamRequestPath('/test?x=1')
     expect(resolved).toEqual({ missingKey: true })
+  })
+
+  it('blocks unsafe proxy response headers', () => {
+    expect(shouldForwardProxyResponseHeader('content-encoding')).toBe(false)
+    expect(shouldForwardProxyResponseHeader('content-length')).toBe(false)
+    expect(shouldForwardProxyResponseHeader('transfer-encoding')).toBe(false)
+    expect(shouldForwardProxyResponseHeader('content-type')).toBe(true)
+    expect(shouldForwardProxyResponseHeader('cache-control')).toBe(true)
   })
 })
 

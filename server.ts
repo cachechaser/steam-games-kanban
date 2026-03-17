@@ -29,6 +29,22 @@ export const sanitizeUrlForLogs = (url = ''): string => {
 
 const STEAM_API_TARGET = 'https://api.steampowered.com';
 
+const BLOCKED_PROXY_RESPONSE_HEADERS = new Set([
+    'connection',
+    'content-encoding',
+    'content-length',
+    'keep-alive',
+    'proxy-authenticate',
+    'proxy-authorization',
+    'te',
+    'trailer',
+    'transfer-encoding',
+    'upgrade'
+]);
+
+export const shouldForwardProxyResponseHeader = (headerName: string): boolean =>
+    !BLOCKED_PROXY_RESPONSE_HEADERS.has(headerName.toLowerCase());
+
 const readRawBody = async (req: Request): Promise<Buffer | undefined> => {
     if (req.method === 'GET' || req.method === 'HEAD') {
         return undefined;
@@ -141,7 +157,7 @@ export const createServerApp = () => {
             });
 
             steamRes.headers.forEach((value, key) => {
-                if (key.toLowerCase() === 'transfer-encoding') return;
+                if (!shouldForwardProxyResponseHeader(key)) return;
                 res.setHeader(key, value);
             });
 
