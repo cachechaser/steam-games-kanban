@@ -412,6 +412,91 @@ describe('useSteam behavior', () => {
     expect(steam.state.lastUpdated).toBeGreaterThan(0)
   })
 
+  it('tracks refresh progress for toast status while refreshing', async () => {
+    installIndexedDbMock()
+
+    let resolveAchievements: (() => void) | null = null
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url.includes('/api/steam/config')) {
+        return Promise.resolve(makeJsonResponse({ hasServerApiKey: true }))
+      }
+      if (url.includes('ISteamUser/GetPlayerSummaries')) {
+        return Promise.resolve(makeJsonResponse({ response: { players: [] } }))
+      }
+      if (url.includes('IPlayerService/GetOwnedGames')) {
+        return Promise.resolve(makeJsonResponse({
+          response: {
+            games: [
+              { appid: 777, name: 'Slow Game', rtime_last_played: 10, playtime_forever: 1 }
+            ]
+          }
+        }))
+      }
+      if (url.includes('GetPlayerAchievements')) {
+        return new Promise<Response>((resolve) => {
+          resolveAchievements = () => {
+            resolve(makeJsonResponse({
+              playerstats: {
+                achievements: [{ apiname: 'ACH_SLOW', achieved: 1, unlocktime: 10 }]
+              }
+            }))
+          }
+        })
+      }
+      if (url.includes('GetSchemaForGame')) {
+        return Promise.resolve(makeJsonResponse({
+          game: {
+            availableGameStats: {
+              achievements: [{ name: 'ACH_SLOW', displayName: 'Slow One', description: '', icon: 'a', icongray: 'b' }]
+            }
+          }
+        }))
+      }
+      if (url.includes('GetGlobalAchievementPercentagesForApp')) {
+        return Promise.resolve(makeJsonResponse({
+          achievementpercentages: {
+            achievements: [{ name: 'ACH_SLOW', percent: 5 }]
+          }
+        }))
+      }
+
+      return Promise.resolve(makeJsonResponse({}))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const steam = await importFreshSteam()
+    steam.state.steamId = '7656119'
+    steam.state.apiKey = ''
+    steam.state.hasServerApiKey = true
+
+    const refreshPromise = steam.refreshLibrary()
+    let enteredAchievementsPhase = false
+    for (let i = 0; i < 20; i += 1) {
+      if (
+        steam.state.refreshStatus.visible &&
+        steam.state.refreshStatus.label.includes('Refreshing Achievements 0/1') &&
+        steam.state.refreshStatus.progress === 0
+      ) {
+        enteredAchievementsPhase = true
+        break
+      }
+      await Promise.resolve()
+    }
+
+    expect(enteredAchievementsPhase).toBe(true)
+
+    expect(resolveAchievements).not.toBeNull()
+    resolveAchievements?.()
+    await refreshPromise
+
+    expect(steam.state.refreshStatus.visible).toBe(false)
+    expect(steam.state.refreshStatus.label).toBe('')
+    expect(steam.state.refreshStatus.progress).toBe(0)
+  })
+
   it('falls back from invalid user key to server key and retries refresh', async () => {
     installIndexedDbMock()
 

@@ -12,6 +12,7 @@ import CompletionView from './components/views/CompletionView.vue'
 import AchievementView from './components/views/AchievementView.vue'
 import HomeView from './components/views/HomeView.vue'
 import DataSyncOverlay from './components/DataSyncOverlay.vue'
+import RefreshStatusToast from './components/ui/RefreshStatusToast.vue'
 
 const {currentView, navigate} = useRouter()
 const {state, loadState, refreshLibrary} = useSteam()
@@ -94,6 +95,7 @@ onMounted(async () => {
 
 <template>
 	<div class="app-container">
+		<RefreshStatusToast :status="state.refreshStatus"/>
 		<NavBar/>
 		<main class="main-content">
 			<!--Global Overlays-->

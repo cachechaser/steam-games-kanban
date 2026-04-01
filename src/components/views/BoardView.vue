@@ -24,7 +24,7 @@ type TouchState = {
 	scrollDirection: -1 | 0 | 1
 }
 
-const {state, refreshLibrary, fetchGameDetails, getCompletionData, updateGameStatus, toggleGameVisibility, copyGameToColumn, removeGameFromColumn} = useStatsAutoLoad()
+const {state, getCompletionData, updateGameStatus, toggleGameVisibility, copyGameToColumn, removeGameFromColumn} = useStatsAutoLoad()
 const {showGameInfo, selectedGame, openGameInfo, closeGameInfo} = useGameInfoModal()
 
 const searchTerm = ref('')
@@ -480,13 +480,6 @@ const getColName = (col: SteamColumn): string => {
 						<font-awesome-icon icon="pen" /> 
 						<span>Edit Board</span>
 					</button>
-					<button @click="() => refreshLibrary()" :disabled="state.loading" class="btn btn-secondary reload-stats-btn">
-						<template v-if="state.loading">Syncing...</template>
-						<template v-else>
-							<font-awesome-icon icon="rotate" /> 
-							<span>Sync Library</span>
-						</template>
-					</button>
 				</div>
 			</template>
 		</ViewHeader>
@@ -565,7 +558,6 @@ const getColName = (col: SteamColumn): string => {
 							:game="game"
 							:completion-data="getCompletionData(game)"
 							:column-color="getColColor(col)"
-							:loading-details="game.loadingDetails"
 							:draggable="true"
 							:is-duplicate="isGameDuplicateInColumn(game, getColName(col))"
 							@dragstart="onDragStart($event, game, getColName(col))"
@@ -574,7 +566,6 @@ const getColName = (col: SteamColumn): string => {
 							@touchend="onTouchEnd($event)"
 							@info="openGameInfo"
 							@hide="toggleHide"
-							@load-stats="fetchGameDetails"
 							@copy="handleCopyGame"
 					/>
 				</KanbanColumn>

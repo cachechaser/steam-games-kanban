@@ -5,6 +5,7 @@ import KanbanColumn from '@/components/ui/KanbanColumn.vue'
 import ViewHeader from '@/components/ui/ViewHeader.vue'
 import GameCard from '@/components/ui/GameCard.vue'
 import AchievementTable from '@/components/AchievementTable.vue'
+import RefreshStatusToast from '@/components/ui/RefreshStatusToast.vue'
 
 describe('UI components', () => {
   it('renders BaseOverlay and emits close', async () => {
@@ -74,6 +75,24 @@ describe('UI components', () => {
 
     await wrapper.find('th').trigger('click')
     expect(wrapper.emitted('sort')).toBeTruthy()
+  })
+
+  it('renders RefreshStatusToast progress', () => {
+    const wrapper = shallowMount(RefreshStatusToast, {
+      props: {
+        status: {
+          visible: true,
+          phase: 'achievements',
+          label: 'Refreshing Achievements 2/4',
+          current: 2,
+          total: 4,
+          progress: 50
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Refreshing Achievements 2/4')
+    expect(wrapper.find('.refresh-toast__fill').attributes('style')).toContain('width: 50%')
   })
 })
 

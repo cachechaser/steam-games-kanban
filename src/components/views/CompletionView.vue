@@ -8,7 +8,7 @@ import KanbanColumn from '../ui/KanbanColumn.vue'
 import ViewHeader from '../ui/ViewHeader.vue'
 import {SteamGame} from "@/types/domain";
 
-const {state, refreshLibrary, toggleGameVisibility} = useStatsAutoLoad()
+const {state, toggleGameVisibility} = useStatsAutoLoad()
 const {showGameInfo, selectedGame, openGameInfo, closeGameInfo} = useGameInfoModal()
 
 const completionColumns = [
@@ -93,17 +93,6 @@ const processedColumns = computed(() => {
 		/>
 
 		<ViewHeader title="Completion Board">
-			<template #actions>
-				<div class="actions">
-					<button @click="() => refreshLibrary()" :disabled="state.loading" class="btn btn-secondary reload-btn">
-						<template v-if="state.loading">Updating Stats...</template>
-						<template v-else>
-							<font-awesome-icon icon="rotate"/>
-							<span>Refresh Stats</span>
-						</template>
-					</button>
-				</div>
-			</template>
 		</ViewHeader>
 
 		<div class="board-container">
@@ -120,10 +109,8 @@ const processedColumns = computed(() => {
 						:game="game"
 						:completion-data="getCompletionData(game)"
 						:column-color="col.color"
-						:loading-details="game.loadingDetails"
 						@info="openGameInfo"
 						@hide="toggleGameVisibility"
-						@load-stats="() => refreshLibrary()"
 				/>
 			</KanbanColumn>
 		</div>

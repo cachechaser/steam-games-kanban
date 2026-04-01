@@ -9,19 +9,16 @@ const props = withDefaults(defineProps<{
 	completionData: CompletionData
 	columnColor?: string
 	draggable?: boolean
-	loadingDetails?: boolean
 	isDuplicate?: boolean
 }>(), {
 	columnColor: DEFAULT_COLUMN_COLOR,
 	draggable: false,
-	loadingDetails: false,
 	isDuplicate: false
 })
 
 const emit = defineEmits<{
 	(e: 'info', game: SteamGame): void
 	(e: 'hide', game: SteamGame): void
-	(e: 'load-stats', game: SteamGame): void
 }>()
 
 const gameIconUrl = (game: SteamGame): string => {
@@ -79,10 +76,7 @@ const completionWidth = () => {
 			<div v-else-if="completionData.error" class="stat-error">
 				{{ completionData.error }}
 			</div>
-			<button v-else @click="emit('load-stats', game)" :disabled="loadingDetails"
-			        class="btn btn-secondary btn-small small-btn">
-				{{ loadingDetails ? '...' : 'Load Stats' }}
-			</button>
+			<div v-else class="stat-error">No achievement data yet</div>
 		</div>
 	</div>
 </template>

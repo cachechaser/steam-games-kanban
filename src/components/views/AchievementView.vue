@@ -10,7 +10,7 @@ import {ACHIEVEMENT_TABLE_COLUMNS, DEFAULT_VISIBLE_COLUMNS} from '@/types/achiev
 import type {SortField, TableColumnOption, VisibleColumn} from '@/types/achievementTable'
 
 const {showGameInfo, selectedGame, openGameInfo, closeGameInfo} = useGameInfoModal()
-const {state, refreshLibrary, getCompletionData} = useStatsAutoLoad()
+const {state, getCompletionData} = useStatsAutoLoad()
 
 // Data
 const currentPage = ref(1)
@@ -251,7 +251,6 @@ watch([filterLocked, filterPlayedOnly, filterColumns, gameSearch, rarityMin, rar
 			</template>
 			<template #actions>
 				<div class="actions">
-					<span v-if="state.loading" class="loading-text">Checking for updates...</span>
 					<button
 							@click="showFilters = !showFilters"
 							class="btn btn-secondary"
@@ -260,14 +259,6 @@ watch([filterLocked, filterPlayedOnly, filterColumns, gameSearch, rarityMin, rar
 						<font-awesome-icon :icon="showFilters ? 'chevron-down' : 'chevron-right'"/>
 						<span>Filters</span>
 						<span v-if="activeFilterCount > 0" class="filter-badge">{{ activeFilterCount }}</span>
-					</button>
-					<button
-							@click="() => refreshLibrary()"
-							:disabled="state.loading"
-							class="btn btn-secondary reload-btn"
-					>
-						<font-awesome-icon icon="rotate"/>
-						<span>Refresh Library</span>
 					</button>
 				</div>
 			</template>

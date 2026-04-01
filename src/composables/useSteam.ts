@@ -1,5 +1,5 @@
 import {reactive, toRaw, watch} from 'vue'
-import type { CollectionImportPayload, CompletionData, GameAchievement, SteamGame, SteamState } from '@/types/domain'
+import type { CollectionImportPayload, CompletionData, GameAchievement, RefreshPhase, RefreshStatus, SteamGame, SteamState } from '@/types/domain'
 import { BACKLOG_COLUMN, DEFAULT_BOARD_COLUMNS } from '@/types/board'
 
 const STATE_KEY = 'steam_kanban_state'
@@ -110,6 +110,15 @@ const clearDB = async (): Promise<void> => {
     }
 }
 
+const createInitialRefreshStatus = (): RefreshStatus => ({
+    visible: false,
+    phase: 'idle',
+    label: '',
+    current: 0,
+    total: 0,
+    progress: 0
+})
+
 const state = reactive<SteamState>({
     steamId: '',
     apiKey: '',
@@ -119,7 +128,8 @@ const state = reactive<SteamState>({
     lastUpdated: 0,
     userProfile: null,
     loading: false,
-    error: null
+    error: null,
+    refreshStatus: createInitialRefreshStatus()
 })
 
 let hasLoadedServerConfig = false
@@ -240,6 +250,24 @@ const saveMetadata = () => {
 
 watch(() => [state.steamId, state.apiKey, state.columns, state.lastUpdated, state.userProfile], saveMetadata)
 
+const setRefreshStatus = (phase: RefreshPhase, label: string, current: number, total: number): void => {
+    const safeTotal = Math.max(total, 0)
+    const safeCurrent = Math.max(0, safeTotal > 0 ? Math.min(current, safeTotal) : current)
+
+    state.refreshStatus.visible = true
+    state.refreshStatus.phase = phase
+    state.refreshStatus.label = label
+    state.refreshStatus.current = safeCurrent
+    state.refreshStatus.total = safeTotal
+    state.refreshStatus.progress = safeTotal > 0
+        ? Math.round((safeCurrent / safeTotal) * 100)
+        : 0
+}
+
+const hideRefreshStatus = (): void => {
+    state.refreshStatus = createInitialRefreshStatus()
+}
+
 // Helper for Stats
 // Returns { total, achieved, error }
 const getCompletionData = (game: SteamGame): CompletionData => {
@@ -289,7 +317,7 @@ const fetchUserProfile = async () => {
 }
 
 // Fetch detailed achievement data for a single game.
-// Used internally by refreshLibrary and exposed for manual single-game "Load Stats" button.
+// Used internally by refreshLibrary.
 const fetchGameDetails = async (game: SteamGame, force = false) => {
     if (game.loadingDetails) return
 
@@ -424,6 +452,9 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
     }
 
     state.loading = true
+    let handedOffRetry = false
+    setRefreshStatus('library', 'Refreshing Library 0/1', 0, 1)
+
     if (!preserveErrorMessage) {
         state.error = null
     }
@@ -444,6 +475,7 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
                 const disabled = disableInvalidUserApiKey('Game List', apiErrorMessage)
                 if (disabled && state.hasServerApiKey && allowUserKeyFallbackRetry) {
                     state.loading = false
+                    handedOffRetry = true
                     await refreshLibrary(false, true)
                     return
                 }
@@ -451,6 +483,8 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
             state.error = apiErrorMessage
             return
         }
+
+        setRefreshStatus('library', 'Refreshing Library 1/1', 1, 1)
 
         const data = await response.json()
         if (!data.response || !data.response.games) {
@@ -506,12 +540,19 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
         if (targets.length > 0) {
             console.log(`Updating achievements for ${targets.length} game(s)...`)
 
+            let completed = 0
+            setRefreshStatus('achievements', `Refreshing Achievements ${completed}/${targets.length}`, completed, targets.length)
+
             const BATCH_SIZE = 3
             for (let i = 0; i < targets.length; i += BATCH_SIZE) {
                 if (state.error && state.error.includes("Rate Limit")) break
 
                 const batch = targets.slice(i, i + BATCH_SIZE)
-                await Promise.all(batch.map(g => fetchGameDetails(g)))
+                await Promise.all(batch.map(async (game) => {
+                    await fetchGameDetails(game)
+                    completed += 1
+                    setRefreshStatus('achievements', `Refreshing Achievements ${completed}/${targets.length}`, completed, targets.length)
+                }))
                 await new Promise(r => setTimeout(r, 100))
             }
         } else {
@@ -525,7 +566,10 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
         state.error = "Network Error: Failed to connect to Steam API."
         console.error(err)
     } finally {
-        state.loading = false
+        if (!handedOffRetry) {
+            state.loading = false
+            hideRefreshStatus()
+        }
     }
 }
 
@@ -858,7 +902,7 @@ export function useSteam() {
         state,
         loadState,
         refreshLibrary,
-        fetchGameDetails, // For manual single-game "Load Stats" button
+        fetchGameDetails,
         fetchUserProfile,
         addColumn,
         removeColumn,
