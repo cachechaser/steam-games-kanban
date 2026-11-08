@@ -1,17 +1,26 @@
 <script setup lang="ts">
-import type { RefreshStatus } from '@/types/domain'
+import type { RefreshStatus } from "@/types/domain";
 
 defineProps<{
-  status: RefreshStatus
-}>()
+  status: RefreshStatus;
+}>();
 </script>
 
 <template>
   <transition name="refresh-toast-fade">
-    <div v-if="status.visible" class="refresh-toast" role="status" aria-live="polite" aria-atomic="true">
+    <div
+      v-if="status.visible"
+      class="refresh-toast"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <div class="refresh-toast__label">{{ status.label }}</div>
       <div class="refresh-toast__track" aria-hidden="true">
-        <div class="refresh-toast__fill" :style="{ width: `${status.progress}%` }"></div>
+        <div
+          class="refresh-toast__fill"
+          :style="{ width: `${status.progress}%` }"
+        ></div>
       </div>
     </div>
   </transition>
@@ -20,7 +29,8 @@ defineProps<{
 <style scoped>
 .refresh-toast {
   position: fixed;
-  top: 18px;
+  /* Sit below the 60px sticky navbar so the toast never covers navigation. */
+  top: 72px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1200;
@@ -32,6 +42,8 @@ defineProps<{
   background: rgba(15, 18, 25, 0.95);
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(4px);
+  /* Never intercept clicks meant for the page underneath. */
+  pointer-events: none;
 }
 
 .refresh-toast__label {
@@ -57,7 +69,9 @@ defineProps<{
 
 .refresh-toast-fade-enter-active,
 .refresh-toast-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .refresh-toast-fade-enter-from,
@@ -68,9 +82,8 @@ defineProps<{
 
 @media (max-width: 640px) {
   .refresh-toast {
-    top: 12px;
+    top: 68px;
     padding: 10px 12px;
   }
 }
 </style>
-

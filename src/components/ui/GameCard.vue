@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import HideIcon from '../icons/HideIcon.vue'
 import InfoIcon from '@/components/icons/InfoIcon.vue'
-import type { CompletionData, SteamGame } from '@/types/domain'
-import { DEFAULT_COLUMN_COLOR } from '@/types/board'
+import type {CompletionData, SteamGame} from '@/types/domain'
+import {DEFAULT_COLUMN_COLOR} from '@/types/board'
+import {ref, computed} from 'vue'
+import {useSteamIcon} from '@/composables/useSteamIcon'
 
 const props = withDefaults(defineProps<{
 	game: SteamGame
@@ -21,9 +23,17 @@ const emit = defineEmits<{
 	(e: 'hide', game: SteamGame): void
 }>()
 
-const gameIconUrl = (game: SteamGame): string => {
-	if (!game.img_icon_url) return '//placehold.co/64x64'
-	return `//media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
+const { getGameIconUrl, handleGameIconError } = useSteamIcon()
+const imageLoadAttempt = ref<'primary' | 'fallback'>('primary')
+
+const gameIconUrl = computed(() => getGameIconUrl(props.game, imageLoadAttempt.value))
+
+const handleImageError = (e: Event): void => {
+	const img = e && (e.target as HTMLImageElement)
+	if (imageLoadAttempt.value === 'primary') {
+		imageLoadAttempt.value = 'fallback'
+		handleGameIconError(props.game, img)
+	}
 }
 
 const completionPercent = () => {
@@ -53,11 +63,12 @@ const completionWidth = () => {
 			<div class="game-icon-wrapper">
 				<img
 						v-if="game.img_icon_url"
-						:src="gameIconUrl(game)"
+						:src="gameIconUrl"
 						alt="icon"
 						class="game-icon"
+						@error="handleImageError"
 				/>
-				<span v-if="isDuplicate" class="duplicate-badge" title="This game appears in multiple columns"><font-awesome-icon icon="copy" /></span>
+				<span v-if="isDuplicate" class="duplicate-badge" title="This game appears in multiple columns"><font-awesome-icon icon="copy"/></span>
 			</div>
 			<span class="game-title">{{ game.name }}</span>
 		</div>

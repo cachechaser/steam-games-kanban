@@ -165,9 +165,24 @@ const loadServerConfig = async (force = false) => {
             return
         }
 
-        const data = await response.json()
-        state.hasServerApiKey = Boolean(data?.hasServerApiKey)
-        hasLoadedServerConfig = true
+        const text = await response.text()
+        if (!text) {
+            state.hasServerApiKey = false
+            return
+        }
+
+        try {
+            const data = JSON.parse(text)
+            state.hasServerApiKey = Boolean(data?.hasServerApiKey)
+            hasLoadedServerConfig = true
+        } catch (parseErr) {
+            console.error("Failed to parse server config JSON", {
+                error: parseErr,
+                responseLength: text.length,
+                responsePreview: text.substring(0, 100)
+            })
+            state.hasServerApiKey = false
+        }
     } catch (e) {
         state.hasServerApiKey = false
         console.warn('Failed to load Steam server config', e)
@@ -306,10 +321,24 @@ const fetchUserProfile = async () => {
             return
         }
 
-        const data = await response.json()
-        if (data.response && data.response.players && data.response.players.length > 0) {
-            state.userProfile = data.response.players[0]
-            saveMetadata()
+        const text = await response.text()
+        if (!text) {
+            console.warn("Empty response from GetPlayerSummaries API")
+            return
+        }
+
+        try {
+            const data = JSON.parse(text)
+            if (data.response && data.response.players && data.response.players.length > 0) {
+                state.userProfile = data.response.players[0]
+                saveMetadata()
+            }
+        } catch (parseErr) {
+            console.error("Failed to parse user profile JSON response", {
+                error: parseErr,
+                responseLength: text.length,
+                responsePreview: text.substring(0, 200)
+            })
         }
     } catch (e) {
         console.error("Failed to fetch user profile", e)
@@ -355,9 +384,45 @@ const fetchGameDetails = async (game: SteamGame, force = false) => {
             throw new Error("Rate Limit Exceeded")
         }
 
-        const playerData = r1.ok ? await r1.json() : null
-        const schemaData = r2.ok ? await r2.json() : null
-        const globalData = r3.ok ? await r3.json() : null
+        let playerData = null
+        let schemaData = null
+        let globalData = null
+
+        try {
+            if (r1.ok) {
+                const text = await r1.text()
+                playerData = text ? JSON.parse(text) : null
+            }
+        } catch (parseErr) {
+            console.error(`Failed to parse player achievements for ${game.name}`, {
+                error: parseErr,
+                status: r1.status
+            })
+        }
+
+        try {
+            if (r2.ok) {
+                const text = await r2.text()
+                schemaData = text ? JSON.parse(text) : null
+            }
+        } catch (parseErr) {
+            console.error(`Failed to parse achievement schema for ${game.name}`, {
+                error: parseErr,
+                status: r2.status
+            })
+        }
+
+        try {
+            if (r3.ok) {
+                const text = await r3.text()
+                globalData = text ? JSON.parse(text) : null
+            }
+        } catch (parseErr) {
+            console.error(`Failed to parse global achievements for ${game.name}`, {
+                error: parseErr,
+                status: r3.status
+            })
+        }
 
         if (!playerData || !playerData.playerstats || !playerData.playerstats.achievements) {
             game.achievementsList = {error: 'No player stats'}
@@ -486,7 +551,27 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
 
         setRefreshStatus('library', 'Refreshing Library 1/1', 1, 1)
 
-        const data = await response.json()
+        const text = await response.text()
+        if (!text) {
+            console.warn("Empty response from GetOwnedGames API")
+            state.games = []
+            await clearDB()
+            return
+        }
+
+        let data: { response: { games: any[] } }
+        try {
+            data = JSON.parse(text)
+        } catch (parseErr) {
+            console.error("Failed to parse GetOwnedGames JSON response", {
+                error: parseErr,
+                responseLength: text.length,
+                responsePreview: text.substring(0, 200)
+            })
+            state.error = "Failed to parse Steam API response"
+            return
+        }
+
         if (!data.response || !data.response.games) {
             state.games = []
             await clearDB()

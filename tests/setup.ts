@@ -5,8 +5,12 @@ config.global.stubs = {
     template: '<i data-test="fa" />'
   },
   Teleport: true,
-  Transition: false,
-  'transition-group': false
+  Transition: {
+    template: '<div><slot /></div>'
+  },
+  'transition-group': {
+    template: '<div><slot /></div>'
+  }
 }
 
 Object.defineProperty(window, 'matchMedia', {
