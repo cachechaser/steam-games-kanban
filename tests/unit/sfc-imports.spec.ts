@@ -1,3 +1,12 @@
+import { vi } from 'vitest'
+
+vi.mock('@/components/NavBar.vue', () => ({
+  default: {
+    name: 'NavBar',
+    setup: () => ({})
+  }
+}))
+
 import App from '@/App.vue'
 import AchievementTable from '@/components/AchievementTable.vue'
 import DataSyncOverlay from '@/components/DataSyncOverlay.vue'

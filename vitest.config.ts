@@ -9,6 +9,7 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  assetsInclude: ['**/*.svg', '**/*.png', '**/*.jpg', '**/*.gif'],
   test: {
     environment: 'jsdom',
     globals: true,

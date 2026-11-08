@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import InfoIcon from './icons/InfoIcon.vue'
-import { DEFAULT_VISIBLE_COLUMNS } from '@/types/achievementTable'
-import type { AchievementTableRow, SortField, VisibleColumn } from '@/types/achievementTable'
+import {DEFAULT_VISIBLE_COLUMNS} from '@/types/achievementTable'
+import type {AchievementTableRow, SortField, VisibleColumn} from '@/types/achievementTable'
+import { useSteamIcon } from '@/composables/useSteamIcon'
+import { onMounted, ref, watch } from 'vue'
 
 const props = withDefaults(defineProps<{
 	achievements: AchievementTableRow[]
@@ -22,6 +24,9 @@ const emit = defineEmits<{
 	(e: 'sort', field: SortField): void
 	(e: 'game-click', achievement: AchievementTableRow): void
 }>()
+
+const { getAchievementIconUrl, handleAchievementIconError, monitorAchievementImages } = useSteamIcon()
+const tableElement = ref<HTMLElement | null>(null)
 
 const isVisible = (key: VisibleColumn): boolean => props.visibleColumns.includes(key)
 
@@ -46,12 +51,28 @@ const onGameClick = (ach: AchievementTableRow): void => {
 	emit('game-click', ach)
 }
 
-const getIconUrl = (ach: AchievementTableRow): string => {
-	const url = ach.achieved ? ach.icon : (ach.iconGray || ach.icongray)
-	if (!url) return ''
-	if (url.startsWith('http')) return url
-	return `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${ach.appid}/${url}.jpg`
+const onIconError = (e: Event, ach: AchievementTableRow): void => {
+	const img = e && (e.target as HTMLImageElement)
+	handleAchievementIconError(ach, img)
 }
+
+// Monitor achievement images and apply fallback if they don't load
+// This handles cases where error event doesn't fire due to network blocking
+onMounted(() => {
+	if (tableElement.value) {
+		monitorAchievementImages(tableElement.value, props.achievements)
+	}
+})
+
+// Also re-monitor when achievements change (scrolling, new data loaded, etc)
+watch(() => props.achievements, (newAchievements) => {
+	if (tableElement.value) {
+		// Use setTimeout to ensure DOM has updated
+		setTimeout(() => {
+			monitorAchievementImages(tableElement.value, newAchievements)
+		}, 100)
+	}
+}, { deep: false })
 
 const formatPlaytime = (minutes?: number): string => {
 	if (!minutes) return '0h'
@@ -62,40 +83,40 @@ const formatPlaytime = (minutes?: number): string => {
 
 <template>
 	<div class="table-responsive">
-		<table class="ach-table">
+		<table ref="tableElement" class="ach-table">
 			<thead>
 			<tr>
 				<th v-if="showGameColumn && isVisible('game')" @click="handleSort('gameName')" :class="['game-cell', {sorted: sortBy === 'gameName'}]">
 					Game
-					<span v-if="sortBy === 'gameName'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
+					<span v-if="sortBy === 'gameName'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'"/></span>
 				</th>
 				<th v-if="isVisible('achievement')" @click="handleSort('achName')" :class="{sorted: sortBy === 'achName'}">
 					Achievement
-					<span v-if="sortBy === 'achName'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
+					<span v-if="sortBy === 'achName'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'"/></span>
 				</th>
 				<th v-if="isVisible('rarityTier')" @click="handleSort('rarityTier')" :class="['text-center', {sorted: sortBy === 'rarityTier'}]">
 					Rarity
-					<span v-if="sortBy === 'rarityTier'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
+					<span v-if="sortBy === 'rarityTier'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'"/></span>
 				</th>
 				<th v-if="isVisible('unlockRate')" @click="handleSort('unlockRate')" :class="{sorted: sortBy === 'unlockRate'}" class="text-right">
 					Global %
-					<span v-if="sortBy === 'unlockRate'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
+					<span v-if="sortBy === 'unlockRate'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'"/></span>
 				</th>
 				<th v-if="isVisible('avgGlobalRarity')" @click="handleSort('avgGlobalRarity')" :class="['text-right', {sorted: sortBy === 'avgGlobalRarity'}]">
 					Avg. Global Rarity
-					<span v-if="sortBy === 'avgGlobalRarity'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
+					<span v-if="sortBy === 'avgGlobalRarity'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'"/></span>
 				</th>
 				<th v-if="isVisible('gameCompletion')" @click="handleSort('gameCompletion')" :class="['text-right', {sorted: sortBy === 'gameCompletion'}]">
 					Game Completion
-					<span v-if="sortBy === 'gameCompletion'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
+					<span v-if="sortBy === 'gameCompletion'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'"/></span>
 				</th>
 				<th v-if="isVisible('playtime')" @click="handleSort('playtime')" :class="['text-right', {sorted: sortBy === 'playtime'}]">
 					Playtime
-					<span v-if="sortBy === 'playtime'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
+					<span v-if="sortBy === 'playtime'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'"/></span>
 				</th>
 				<th v-if="isVisible('unlockDate')" @click="handleSort('unlockDate')" :class="{sorted: sortBy === 'unlockDate'}" class="text-right">
 					Unlock Date
-					<span v-if="sortBy === 'unlockDate'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'" /></span>
+					<span v-if="sortBy === 'unlockDate'" class="sort-icon"><font-awesome-icon :icon="sortDesc ? 'sort-down' : 'sort-up'"/></span>
 				</th>
 			</tr>
 			</thead>
@@ -116,7 +137,19 @@ const formatPlaytime = (minutes?: number): string => {
 				</td>
 				<td v-if="isVisible('achievement')" class="desc-cell">
 					<div class="ach-content-wrapper">
-						<img :src="getIconUrl(ach)" class="ach-img" alt="" loading="lazy"/>
+						<img 
+							:src="getAchievementIconUrl(ach)" 
+							class="ach-img" 
+							alt="" 
+							:data-ach-key="`${ach.appid}-${ach.apiname}`"
+							@error="(e) => onIconError(e, ach)"
+							@load="(e) => {
+								const img = e.target as HTMLImageElement
+								if (img.complete && img.naturalHeight === 0) {
+									onIconError(e, ach)
+								}
+							}"
+						/>
 						<div class="ach-text">
 							<div class="ach-title">{{ ach.name }}</div>
 							<div class="ach-desc">{{ ach.description }}</div>
@@ -152,8 +185,8 @@ const formatPlaytime = (minutes?: number): string => {
                     <span v-if="ach.achieved && (ach.unlockTime || ach.unlocktime)" class="unlock-date">
                         {{ new Date((ach.unlockTime || ach.unlocktime) * 1000).toLocaleDateString() }}
                     </span>
-					<span v-else-if="ach.achieved" class="status-text unlocked"><font-awesome-icon icon="check" /></span>
-					<span v-else class="status-text locked"><font-awesome-icon icon="lock" /></span>
+					<span v-else-if="ach.achieved" class="status-text unlocked"><font-awesome-icon icon="check"/></span>
+					<span v-else class="status-text locked"><font-awesome-icon icon="lock"/></span>
 				</td>
 			</tr>
 			</tbody>

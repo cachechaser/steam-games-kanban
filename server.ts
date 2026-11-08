@@ -6,82 +6,20 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import type { Request, Response, NextFunction } from 'express';
 import { attachSignaling } from './lib/signaling';
+import {
+    STEAM_API_TARGET,
+    buildSteamProxyHeaders,
+    getServerSteamApiKey,
+    readRawBodyFromIncomingMessage,
+    resolveSteamRequestPath,
+    sanitizeUrlForLogs,
+    type SteamPathResolution
+} from './lib/steamApi';
+
+export { getServerSteamApiKey, resolveSteamRequestPath, sanitizeUrlForLogs } from './lib/steamApi';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PORT = Number(process.env.SERVER_PORT || 3000);
-
-export const getServerSteamApiKey = (): string => {
-    const key = process.env.STEAM_WEB_API_KEY || process.env.STEAM_API_KEY;
-    return typeof key === 'string' ? key.trim() : '';
-};
-
-export const sanitizeUrlForLogs = (url = ''): string => {
-    try {
-        const parsed = new URL(url, 'http://localhost');
-        if (parsed.searchParams.has('key')) {
-            parsed.searchParams.set('key', '[REDACTED]');
-        }
-        return `${parsed.pathname}${parsed.search}`.replace(/key=%5BREDACTED%5D/gi, 'key=[REDACTED]');
-    } catch {
-        return String(url).replace(/([?&]key=)[^&]+/i, '$1[REDACTED]');
-    }
-};
-
-const STEAM_API_TARGET = 'https://api.steampowered.com';
-
-const BLOCKED_PROXY_RESPONSE_HEADERS = new Set([
-    'connection',
-    'content-encoding',
-    'content-length',
-    'keep-alive',
-    'proxy-authenticate',
-    'proxy-authorization',
-    'te',
-    'trailer',
-    'transfer-encoding',
-    'upgrade'
-]);
-
-export const shouldForwardProxyResponseHeader = (headerName: string): boolean =>
-    !BLOCKED_PROXY_RESPONSE_HEADERS.has(headerName.toLowerCase());
-
-const readRawBody = async (req: Request): Promise<Buffer | undefined> => {
-    if (req.method === 'GET' || req.method === 'HEAD') {
-        return undefined;
-    }
-
-    return await new Promise((resolve, reject) => {
-        const chunks: Buffer[] = [];
-        req.on('data', (chunk) => {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-        });
-        req.on('end', () => resolve(chunks.length ? Buffer.concat(chunks) : Buffer.alloc(0)));
-        req.on('error', reject);
-    });
-};
-
-type SteamPathResolution =
-    | { missingKey: true }
-    | { missingKey: false; keySource: 'user' | 'server'; path: string };
-
-export const resolveSteamRequestPath = (incomingPath = ''): SteamPathResolution => {
-    const parsed = new URL(incomingPath, 'http://localhost');
-    const userKey = parsed.searchParams.get('key')?.trim();
-    const serverKey = getServerSteamApiKey();
-    const effectiveKey = userKey || serverKey;
-
-    if (!effectiveKey) {
-        return { missingKey: true };
-    }
-
-    parsed.searchParams.set('key', effectiveKey);
-
-    return {
-        missingKey: false,
-        keySource: userKey ? 'user' : 'server',
-        path: `${parsed.pathname}${parsed.search}`
-    };
-};
 
 export const createServerApp = () => {
     const app = express();
@@ -140,14 +78,9 @@ export const createServerApp = () => {
 
         try {
             const targetUrl = `${STEAM_API_TARGET}${targetPath}`;
-            const body = await readRawBody(req);
-            const headers: Record<string, string> = {};
-
-            for (const [key, value] of Object.entries(req.headers)) {
-                if (!value) continue;
-                if (key.toLowerCase() === 'host' || key.toLowerCase() === 'content-length') continue;
-                headers[key] = Array.isArray(value) ? value.join(',') : value;
-            }
+            const body = await readRawBodyFromIncomingMessage(req);
+            const headers = buildSteamProxyHeaders(req.headers);
+            headers['accept-encoding'] = 'identity';
 
             const steamRes = await fetch(targetUrl, {
                 method: req.method,
@@ -157,12 +90,12 @@ export const createServerApp = () => {
             });
 
             steamRes.headers.forEach((value, key) => {
-                if (!shouldForwardProxyResponseHeader(key)) return;
+                if (key.toLowerCase() === 'transfer-encoding') return;
                 res.setHeader(key, value);
             });
 
             const responseBody = Buffer.from(await steamRes.arrayBuffer());
-            console.log(`[Proxy Response] ${safePath} | status=${steamRes.status}`);
+            console.log(`[Proxy Response] ${safePath} | status=${steamRes.status} | size=${responseBody.length}`);
             res.status(steamRes.status).send(responseBody);
         } catch (err) {
             const error = err as Error & { code?: string };
@@ -179,7 +112,7 @@ export const createServerApp = () => {
     app.use(express.static(path.join(__dirname, 'dist')));
 
     // Handle SPA Routing (Reloads work correctly)
-    app.get('*', (req: Request, res: Response) => {
+    app.get(/^(?!.*\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)).*$/, (req: Request, res: Response) => {
         const clientIP = req.ip || req.socket.remoteAddress || 'Unknown';
         console.log(`[SPA Fallback] Serving index.html for ${req.url} | IP: ${clientIP}`);
         res.sendFile(path.join(__dirname, 'dist', 'index.html'), (err) => {

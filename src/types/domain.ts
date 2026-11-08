@@ -50,6 +50,17 @@ export interface SteamGame {
   [key: string]: unknown
 }
 
+export type RefreshPhase = 'idle' | 'library' | 'achievements'
+
+export interface RefreshStatus {
+  visible: boolean
+  phase: RefreshPhase
+  label: string
+  current: number
+  total: number
+  progress: number
+}
+
 export interface SteamState {
   steamId: string
   apiKey: string
@@ -60,6 +71,7 @@ export interface SteamState {
   userProfile: SteamUserProfile | null
   loading: boolean
   error: string | null
+  refreshStatus: RefreshStatus
 }
 
 export interface CollectionImportPayload {

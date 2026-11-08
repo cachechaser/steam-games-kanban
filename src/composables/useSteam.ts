@@ -1,5 +1,5 @@
 import {reactive, toRaw, watch} from 'vue'
-import type { CollectionImportPayload, CompletionData, GameAchievement, SteamGame, SteamState } from '@/types/domain'
+import type { CollectionImportPayload, CompletionData, GameAchievement, RefreshPhase, RefreshStatus, SteamGame, SteamState } from '@/types/domain'
 import { BACKLOG_COLUMN, DEFAULT_BOARD_COLUMNS } from '@/types/board'
 
 const STATE_KEY = 'steam_kanban_state'
@@ -110,6 +110,15 @@ const clearDB = async (): Promise<void> => {
     }
 }
 
+const createInitialRefreshStatus = (): RefreshStatus => ({
+    visible: false,
+    phase: 'idle',
+    label: '',
+    current: 0,
+    total: 0,
+    progress: 0
+})
+
 const state = reactive<SteamState>({
     steamId: '',
     apiKey: '',
@@ -119,7 +128,8 @@ const state = reactive<SteamState>({
     lastUpdated: 0,
     userProfile: null,
     loading: false,
-    error: null
+    error: null,
+    refreshStatus: createInitialRefreshStatus()
 })
 
 let hasLoadedServerConfig = false
@@ -155,9 +165,24 @@ const loadServerConfig = async (force = false) => {
             return
         }
 
-        const data = await response.json()
-        state.hasServerApiKey = Boolean(data?.hasServerApiKey)
-        hasLoadedServerConfig = true
+        const text = await response.text()
+        if (!text) {
+            state.hasServerApiKey = false
+            return
+        }
+
+        try {
+            const data = JSON.parse(text)
+            state.hasServerApiKey = Boolean(data?.hasServerApiKey)
+            hasLoadedServerConfig = true
+        } catch (parseErr) {
+            console.error("Failed to parse server config JSON", {
+                error: parseErr,
+                responseLength: text.length,
+                responsePreview: text.substring(0, 100)
+            })
+            state.hasServerApiKey = false
+        }
     } catch (e) {
         state.hasServerApiKey = false
         console.warn('Failed to load Steam server config', e)
@@ -240,6 +265,24 @@ const saveMetadata = () => {
 
 watch(() => [state.steamId, state.apiKey, state.columns, state.lastUpdated, state.userProfile], saveMetadata)
 
+const setRefreshStatus = (phase: RefreshPhase, label: string, current: number, total: number): void => {
+    const safeTotal = Math.max(total, 0)
+    const safeCurrent = Math.max(0, safeTotal > 0 ? Math.min(current, safeTotal) : current)
+
+    state.refreshStatus.visible = true
+    state.refreshStatus.phase = phase
+    state.refreshStatus.label = label
+    state.refreshStatus.current = safeCurrent
+    state.refreshStatus.total = safeTotal
+    state.refreshStatus.progress = safeTotal > 0
+        ? Math.round((safeCurrent / safeTotal) * 100)
+        : 0
+}
+
+const hideRefreshStatus = (): void => {
+    state.refreshStatus = createInitialRefreshStatus()
+}
+
 // Helper for Stats
 // Returns { total, achieved, error }
 const getCompletionData = (game: SteamGame): CompletionData => {
@@ -279,10 +322,24 @@ const fetchUserProfile = async () => {
             return
         }
 
-        const data = await response.json()
-        if (data.response && data.response.players && data.response.players.length > 0) {
-            state.userProfile = data.response.players[0]
-            saveMetadata()
+        const text = await response.text()
+        if (!text) {
+            console.warn("Empty response from GetPlayerSummaries API")
+            return
+        }
+
+        try {
+            const data = JSON.parse(text)
+            if (data.response && data.response.players && data.response.players.length > 0) {
+                state.userProfile = data.response.players[0]
+                saveMetadata()
+            }
+        } catch (parseErr) {
+            console.error("Failed to parse user profile JSON response", {
+                error: parseErr,
+                responseLength: text.length,
+                responsePreview: text.substring(0, 200)
+            })
         }
     } catch (e) {
         console.error("Failed to fetch user profile", e)
@@ -290,7 +347,7 @@ const fetchUserProfile = async () => {
 }
 
 // Fetch detailed achievement data for a single game.
-// Used internally by refreshLibrary and exposed for manual single-game "Load Stats" button.
+// Used internally by refreshLibrary.
 const fetchGameDetails = async (game: SteamGame, force = false) => {
     if (game.loadingDetails) return
 
@@ -330,9 +387,45 @@ const fetchGameDetails = async (game: SteamGame, force = false) => {
             throw new Error("Rate Limit Exceeded")
         }
 
-        const playerData = r1.ok ? await r1.json() : null
-        const schemaData = r2.ok ? await r2.json() : null
-        const globalData = r3.ok ? await r3.json() : null
+        let playerData = null
+        let schemaData = null
+        let globalData = null
+
+        try {
+            if (r1.ok) {
+                const text = await r1.text()
+                playerData = text ? JSON.parse(text) : null
+            }
+        } catch (parseErr) {
+            console.error(`Failed to parse player achievements for ${game.name}`, {
+                error: parseErr,
+                status: r1.status
+            })
+        }
+
+        try {
+            if (r2.ok) {
+                const text = await r2.text()
+                schemaData = text ? JSON.parse(text) : null
+            }
+        } catch (parseErr) {
+            console.error(`Failed to parse achievement schema for ${game.name}`, {
+                error: parseErr,
+                status: r2.status
+            })
+        }
+
+        try {
+            if (r3.ok) {
+                const text = await r3.text()
+                globalData = text ? JSON.parse(text) : null
+            }
+        } catch (parseErr) {
+            console.error(`Failed to parse global achievements for ${game.name}`, {
+                error: parseErr,
+                status: r3.status
+            })
+        }
 
         if (!playerData || !playerData.playerstats || !playerData.playerstats.achievements) {
             game.achievementsList = {error: 'No player stats'}
@@ -427,6 +520,9 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
     }
 
     state.loading = true
+    let handedOffRetry = false
+    setRefreshStatus('library', 'Refreshing Library 0/1', 0, 1)
+
     if (!preserveErrorMessage) {
         state.error = null
     }
@@ -447,6 +543,7 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
                 const disabled = disableInvalidUserApiKey('Game List', apiErrorMessage)
                 if (disabled && state.hasServerApiKey && allowUserKeyFallbackRetry) {
                     state.loading = false
+                    handedOffRetry = true
                     await refreshLibrary(false, true)
                     return
                 }
@@ -455,7 +552,29 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
             return
         }
 
-        const data = await response.json()
+        setRefreshStatus('library', 'Refreshing Library 1/1', 1, 1)
+
+        const text = await response.text()
+        if (!text) {
+            console.warn("Empty response from GetOwnedGames API")
+            state.games = []
+            await clearDB()
+            return
+        }
+
+        let data: { response: { games: any[] } }
+        try {
+            data = JSON.parse(text)
+        } catch (parseErr) {
+            console.error("Failed to parse GetOwnedGames JSON response", {
+                error: parseErr,
+                responseLength: text.length,
+                responsePreview: text.substring(0, 200)
+            })
+            state.error = "Failed to parse Steam API response"
+            return
+        }
+
         if (!data.response || !data.response.games) {
             state.games = []
             await clearDB()
@@ -509,12 +628,19 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
         if (targets.length > 0) {
             console.log(`Updating achievements for ${targets.length} game(s)...`)
 
+            let completed = 0
+            setRefreshStatus('achievements', `Refreshing Achievements ${completed}/${targets.length}`, completed, targets.length)
+
             const BATCH_SIZE = 3
             for (let i = 0; i < targets.length; i += BATCH_SIZE) {
                 if (state.error && state.error.includes("Rate Limit")) break
 
                 const batch = targets.slice(i, i + BATCH_SIZE)
-                await Promise.all(batch.map(g => fetchGameDetails(g)))
+                await Promise.all(batch.map(async (game) => {
+                    await fetchGameDetails(game)
+                    completed += 1
+                    setRefreshStatus('achievements', `Refreshing Achievements ${completed}/${targets.length}`, completed, targets.length)
+                }))
                 await new Promise(r => setTimeout(r, 100))
             }
         } else {
@@ -528,7 +654,10 @@ const refreshLibrary = async (allowUserKeyFallbackRetry = true, preserveErrorMes
         state.error = "Network Error: Failed to connect to Steam API."
         console.error(err)
     } finally {
-        state.loading = false
+        if (!handedOffRetry) {
+            state.loading = false
+            hideRefreshStatus()
+        }
     }
 }
 
@@ -861,7 +990,7 @@ export function useSteam() {
         state,
         loadState,
         refreshLibrary,
-        fetchGameDetails, // For manual single-game "Load Stats" button
+        fetchGameDetails,
         fetchUserProfile,
         addColumn,
         removeColumn,
